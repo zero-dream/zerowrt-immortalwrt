@@ -1,0 +1,16 @@
+#
+# Copyright (C) 2013 OpenWrt.org
+#
+
+mpc85xx_set_preinit_iface() {
+	case $(board_name) in
+	watchguard,xtm330)
+		ifname=port1
+		;;
+	*)
+		ifname=eth0
+		;;
+	esac
+}
+
+boot_hook_add preinit_main mpc85xx_set_preinit_iface
