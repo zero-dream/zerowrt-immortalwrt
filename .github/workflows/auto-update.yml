@@ -1,0 +1,88 @@
+# ! ZeroDreamPrivate
+
+# CI 项目
+name: auto-update
+
+# CI 权限
+permissions: write-all
+
+# CI 计划
+on:
+  # 自动运行: 每天早上 3 点
+  schedule:
+    - cron: 0 19 * * *
+  # 手动运行
+  workflow_dispatch:
+
+# CI 环境
+env:
+  # GITHUB ENV
+  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+# CI 任务
+jobs:
+  auto-update:
+    name: auto-update
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+        with:
+          token: ${{secrets.WORKFLOW_TOKEN}}
+
+      - name: InitWorkflow
+        run: |
+          WorkflowPath="$RUNNER_TEMP/Workflow-$(uuidgen | tr -d '-')"
+          git clone --depth=1 https://github.com/zero-dream/action-workflow.git "$WorkflowPath/"
+          chmod +x "$WorkflowPath/zerodream/main/init.sh"
+          source "$WorkflowPath/zerodream/main/init.sh"
+          # --------------------------------------------------
+          source "$ZD_ScriptLibPath/hook.sh"
+          hook 'AutoUpdate/InitWorkflow'
+
+      - name: UpdateRepo
+        run: |
+          # Source
+          source "$ZD_ScriptLibPath/createPath.sh"
+          source "$ZD_ScriptLibPath/updateRepo.sh"
+          # CloneRepo
+          updatePath=$(cloneRepo)
+          # CloneImmoRepo
+          immoRepoPath="$(createTempPath 'Temp_ImmoRepo:dir')"
+          immoRepo="VIKINGYFY/immortalwrt"
+          git clone --depth=1 https://github.com/$immoRepo.git "$immoRepoPath/"
+          # --------------------------------------------------
+          # CopyZeroDream
+          cp -a "$updatePath/zerodream/" "$immoRepoPath/"
+          # CopyWorkflows
+          coverArr=(
+            'auto-update'
+            'clean-all'
+            'clean-release'
+          )
+          mkdir -p "$immoRepoPath/.github/workflows/"
+          for cover in "${coverArr[@]}"; do
+            cp -a "$updatePath/.github/workflows/$cover.yml" "$immoRepoPath/.github/workflows/"
+          done
+          # CopyREADME
+          cp -a "$updatePath/README.md" "$immoRepoPath/README.md"
+          # AddGitIgnore
+          grep -q "^/.zerodream-temp$" "$immoRepoPath/.gitignore" \
+            || printf "\n/.zerodream-temp\n" >> "$immoRepoPath/.gitignore"
+          # --------------------------------------------------
+          # HandleGitDir
+          rm -rf "$immoRepoPath/.git/"
+          cp -a "$updatePath/.git/" "$immoRepoPath/"
+          # MergeRepo
+          find "$updatePath/" -mindepth 1 -delete
+          cp -a "$immoRepoPath/." "$updatePath/"
+          # DeleteTempPath
+          rm -rf "$immoRepoPath/"
+          # PushRepo
+          commit=$ZD_DATE
+          pushRepo "$commit"
+
+  clean:
+    name: clean-release
+    needs: [auto-update]
+    uses: ./.github/workflows/clean-release.yml
