@@ -9,8 +9,6 @@
 
   [VIKINGYFY/immortalwrt](https://github.com/VIKINGYFY/immortalwrt)
 
-  \--------------------------------------------------
-
   ### Precautions (注意事项)
 
   This repository is for archival purposes only<br />
