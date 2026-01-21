@@ -41,8 +41,8 @@ jobs:
       - name: UpdateRepo
         run: |
           # Source
-          source "$ZD_ScriptLibPath/createPath.sh"
-          source "$ZD_ScriptLibPath/updateRepo.sh"
+          source "$ZD_LibPath/createPath.sh"
+          source "$ZD_LibPath/updateRepo.sh"
           # CloneRepo
           updatePath=$(cloneRepo)
           # CloneImmoRepo
