@@ -1,0 +1,14 @@
+#!/bin/sh
+# Copyright (C) 2024 ZqinKing <zqinking23@gmail.com>
+
+cpu="$(top -bn1 | awk -F ' ' 'NR==2 {print $2}')"
+output="CPU: ${cpu}"
+
+for ppe in /sys/kernel/debug/ppe*/entries; do
+	[ -f "$ppe" ] || continue
+	count="$(wc -l < "$ppe")"
+	name="$(basename "$(dirname "$ppe")" | tr 'a-z' 'A-Z')"
+	[ -n "$count" ] && output="${output} ${name}: ${count}"
+done
+
+echo -n "$output"
