@@ -1,0 +1,36 @@
+# CI 项目
+name: auto-update
+
+# CI 权限
+permissions: write-all
+
+# CI 计划
+on:
+  # 自动运行: 每天早上 3 点
+  schedule:
+    - cron: 0 19 * * *
+  # 手动运行
+  workflow_dispatch:
+
+# CI 环境
+env:
+  # GITHUB ENV
+  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+# CI 任务
+jobs:
+  update-main:
+    name: update-main
+    uses: ./.github/workflows/zerowrt-update.yml
+    secrets: inherit
+    with:
+      # 源码分支
+      WRT_BRANCH: main
+
+  update-owrt:
+    name: update-owrt
+    uses: ./.github/workflows/zerowrt-update.yml
+    secrets: inherit
+    with:
+      # 源码分支
+      WRT_BRANCH: owrt
