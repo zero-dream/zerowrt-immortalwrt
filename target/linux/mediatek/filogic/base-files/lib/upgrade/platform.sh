@@ -89,6 +89,7 @@ platform_do_upgrade() {
 	bananapi,bpi-r4-lite|\
 	bazis,ax3000wm|\
 	cetron,ct3003-ubootmod|\
+	clx,s20p|\
 	cmcc,a10-ubootmod|\
 	cmcc,rax3000m|\
 	cmcc,rax3000me|\
@@ -391,6 +392,7 @@ platform_copy_config() {
 	bananapi,bpi-r4-2g5|\
 	bananapi,bpi-r4-poe|\
 	bananapi,bpi-r4-lite|\
+	clx,s20p|\
 	cmcc,rax3000m|\
 	cmcc,rax3000me|\
 	gatonetworks,gdsp|\
