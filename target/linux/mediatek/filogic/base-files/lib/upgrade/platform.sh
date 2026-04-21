@@ -120,8 +120,8 @@ platform_do_upgrade() {
 	bananapi,bpi-r3-mini|\
 	bananapi,bpi-r4|\
 	bananapi,bpi-r4-2g5|\
-	bananapi,bpi-r4-poe|\
 	bananapi,bpi-r4-lite|\
+	bananapi,bpi-r4-poe|\
 	bazis,ax3000wm|\
 	cetron,ct3003-ubootmod|\
 	cmcc,a10-ubootmod|\
@@ -131,9 +131,9 @@ platform_do_upgrade() {
 	cudy,tr3000-v1-ubootmod|\
 	cudy,wbr3000uax-v1-ubootmod|\
 	cudy,wr3000e-v1-ubootmod|\
-	cudy,wr3000s-v1-ubootmod|\
 	cudy,wr3000h-v1-ubootmod|\
 	cudy,wr3000p-v1-ubootmod|\
+	cudy,wr3000s-v1-ubootmod|\
 	gatonetworks,gdsp|\
 	h3c,magic-nx30-pro|\
 	imou,hx21|\
@@ -144,18 +144,17 @@ platform_do_upgrade() {
 	mediatek,mt7981-rfb|\
 	mediatek,mt7988a-rfb|\
 	mercusys,mr90x-v1-ubi|\
+	netcore,n60|\
+	netcore,n60-pro|\
 	netis,nx30v2|\
 	netis,nx31|\
 	netis,nx32u|\
 	nokia,ea0326gmp|\
 	openwrt,one|\
-	netcore,n60|\
-	netcore,n60-pro|\
 	qihoo,360t7|\
 	routerich,ax3000-ubootmod|\
 	routerich,be7200|\
 	snr,snr-cpe-ax2|\
-	supergateway,s20p|\
 	tplink,tl-7dr7230-v1|\
 	tplink,tl-7dr7230-v2|\
 	tplink,tl-7dr7250-v1|\
@@ -164,8 +163,8 @@ platform_do_upgrade() {
 	tplink,tl-xdr6088|\
 	tplink,tl-xtr8488|\
 	xiaomi,mi-router-ax3000t-ubootmod|\
-	xiaomi,redmi-router-ax6000-ubootmod|\
 	xiaomi,mi-router-wr30u-ubootmod|\
+	xiaomi,redmi-router-ax6000-ubootmod|\
 	zyxel,ex5601-t0-ubootmod|\
 	zyxel,wx5600-t0-ubootmod)
 		fit_do_upgrade "$1"
@@ -188,7 +187,10 @@ platform_do_upgrade() {
 	smartrg,sdg-8632|\
 	smartrg,sdg-8733|\
 	smartrg,sdg-8733a|\
-	smartrg,sdg-8734)
+	smartrg,sdg-8734|\
+	supergateway,s20l|\
+	supergateway,s20m|\
+	supergateway,s20p)
 		CI_KERNPART="kernel"
 		CI_ROOTPART="rootfs"
 		emmc_do_upgrade "$1"
@@ -329,8 +331,8 @@ platform_check_image() {
 	bananapi,bpi-r3-mini|\
 	bananapi,bpi-r4|\
 	bananapi,bpi-r4-2g5|\
-	bananapi,bpi-r4-poe|\
 	bananapi,bpi-r4-lite|\
+	bananapi,bpi-r4-poe|\
 	bazis,ax3000wm|\
 	cetron,ct3003-ubootmod|\
 	cmcc,a10-ubootmod|\
@@ -340,9 +342,9 @@ platform_check_image() {
 	cudy,tr3000-v1-ubootmod|\
 	cudy,wbr3000uax-v1-ubootmod|\
 	cudy,wr3000e-v1-ubootmod|\
-	cudy,wr3000s-v1-ubootmod|\
 	cudy,wr3000h-v1-ubootmod|\
 	cudy,wr3000p-v1-ubootmod|\
+	cudy,wr3000s-v1-ubootmod|\
 	gatonetworks,gdsp|\
 	h3c,magic-nx30-pro|\
 	imou,lc-hx3001|\
@@ -353,11 +355,11 @@ platform_check_image() {
 	mediatek,mt7981-rfb|\
 	mediatek,mt7988a-rfb|\
 	mercusys,mr90x-v1-ubi|\
-	nokia,ea0326gmp|\
-	netis,nx32u|\
-	openwrt,one|\
 	netcore,n60|\
 	netcore,n60-pro|\
+	netis,nx32u|\
+	nokia,ea0326gmp|\
+	openwrt,one|\
 	qihoo,360t7|\
 	routerich,ax3000-ubootmod|\
 	tplink,tl-7dr7230-v1|\
@@ -368,8 +370,8 @@ platform_check_image() {
 	tplink,tl-xdr6088|\
 	tplink,tl-xtr8488|\
 	xiaomi,mi-router-ax3000t-ubootmod|\
-	xiaomi,redmi-router-ax6000-ubootmod|\
 	xiaomi,mi-router-wr30u-ubootmod|\
+	xiaomi,redmi-router-ax6000-ubootmod|\
 	zyxel,ex5601-t0-ubootmod)
 		fit_check_image "$1"
 		return $?
@@ -419,6 +421,9 @@ platform_copy_config() {
 	smartrg,sdg-8733|\
 	smartrg,sdg-8733a|\
 	smartrg,sdg-8734|\
+	supergateway,s20l|\
+	supergateway,s20m|\
+	supergateway,s20p|\
 	ubnt,unifi-6-plus)
 		emmc_copy_config
 		;;
@@ -426,13 +431,12 @@ platform_copy_config() {
 	bananapi,bpi-r3-mini|\
 	bananapi,bpi-r4|\
 	bananapi,bpi-r4-2g5|\
-	bananapi,bpi-r4-poe|\
 	bananapi,bpi-r4-lite|\
+	bananapi,bpi-r4-poe|\
 	cmcc,rax3000m|\
 	cmcc,rax3000me|\
 	gatonetworks,gdsp|\
-	mediatek,mt7988a-rfb|\
-	supergateway,s20p)
+	mediatek,mt7988a-rfb)
 		if [ "$CI_METHOD" = "emmc" ]; then
 			emmc_copy_config
 		fi
