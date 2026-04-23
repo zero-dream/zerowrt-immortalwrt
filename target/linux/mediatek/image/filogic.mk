@@ -928,7 +928,7 @@ define Device/supergateway_s20m
   DEVICE_MODEL := S20M
   DEVICE_DTS := mt7986a-supergateway-s20m
   DEVICE_PACKAGES += -kmod-mt76 -kmod-mt76-connac -kmod-mt76-core -kmod-mt7915e \
-    -kmod-mt7915-firmware -kmod-mt7916-firmware -kmod-mt7986-firmware -mt7986-wo-firmware \
+    -kmod-mt7915-firmware -kmod-mt7916-firmware -kmod-mt7986-firmware -mt7986-wo-firmware
 endef
 TARGET_DEVICES += supergateway_s20m
 
