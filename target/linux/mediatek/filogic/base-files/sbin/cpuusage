@@ -1,14 +1,18 @@
 #!/bin/sh
 # Copyright (C) 2024 ZqinKing <zqinking23@gmail.com>
 
-cpu="$(top -bn1 | awk -F ' ' 'NR==2 {print $2}')"
+cpu="$(top -bn1 | awk 'NR==2 {print $2}')"
 output="CPU: ${cpu}"
 
 for ppe in /sys/kernel/debug/ppe*/entries; do
 	[ -f "$ppe" ] || continue
-	count="$(wc -l < "$ppe")"
+
+	total="$(wc -l < "$ppe")"
+	ipv4="$(grep -c 'IPv4' "$ppe")"
+	ipv6="$(grep -c 'IPv6' "$ppe")"
 	name="$(basename "$(dirname "$ppe")" | tr 'a-z' 'A-Z')"
-	[ -n "$count" ] && output="${output} ${name}: ${count}"
+
+	[ -n "$total" ] && output="${output} ${name}: ${total} (IPv4: ${ipv4} IPv6: ${ipv6})"
 done
 
 echo -n "$output"
