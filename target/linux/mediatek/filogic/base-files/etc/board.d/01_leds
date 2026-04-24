@@ -121,7 +121,7 @@ nokia,ea0326gmp)
 	ucidef_set_led_netdev "lan" "LAN" "green:lan" "br-lan" "link"
 	ucidef_set_led_netdev "wlan" "WLAN" "green:wlan" "phy1-ap0" "link"
 	;;
-livinet,zr-3020|\
+livinet,zr-3020-stock|\
 livinet,zr-3020-ubootmod)
 	ucidef_set_led_netdev "internet" "INTERNET" "blue:internet" "wan"
 	ucidef_set_led_netdev "wlan2g" "WLAN2G" "blue:wlan2g" "phy0-ap0"
@@ -331,6 +331,12 @@ tplink,tl-7dr7250-v1)
 	ucidef_set_led_netdev "lan1" "LAN1" "mt7530-0:01:green:lan" "lan1"
 	ucidef_set_led_netdev "lan2" "LAN2" "mt7530-0:00:green:lan" "lan2"
 	ucidef_set_led_netdev "lan3" "LAN3" "mdio-bus:0f:green:lan" "lan3"
+	;;
+tplink,tl-7dr7299-v1)
+	ucidef_set_led_netdev "lan1" "LAN1" "mt7530-0:02:green:lan" "lan1"
+	ucidef_set_led_netdev "lan2" "LAN2" "mt7530-0:03:green:lan" "lan2"
+	ucidef_set_led_netdev "wan" "WAN" "mdio-bus:01:green:wan" "eth1"
+	ucidef_set_led_switch "sfp" "SFP" "green:sfp" "switch0" "0x20"
 	;;
 wavlink,wl-wn536ax6-a)
 	ucidef_set_led_netdev "wifi" "wifi" "blue:wlan" "phy1-ap0" "link"

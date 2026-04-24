@@ -9,7 +9,7 @@
 #include "mt7986b.dtsi"
 
 / {
-	model = "Zyxel WX5600-T0 ubootmod";
+	model = "Zyxel WX5600-T0 (OpenWrt U-Boot layout)";
 	compatible = "zyxel,wx5600-t0-ubootmod", "mediatek,mt7986b";
 
 	aliases {

@@ -8,7 +8,7 @@
 #include "mt7986a-zyxel-ex5601-t0-common.dtsi"
 
 / {
-	model = "Zyxel EX5601-T0 ubootmod";
+	model = "Zyxel EX5601-T0 (OpenWrt U-Boot layout)";
 	compatible = "zyxel,ex5601-t0-ubootmod", "mediatek,mt7986a";
 
 	chosen {

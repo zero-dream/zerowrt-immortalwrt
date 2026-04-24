@@ -5,7 +5,7 @@ START=99
 
 boot() {
 	case $(board_name) in
-	xiaomi,mi-router-ax3000t)
+	xiaomi,mi-router-ax3000t-stock)
 		. /lib/upgrade/common.sh
 		[ "$(rootfs_type)" = "tmpfs" ] && \
 			logger "bootcount: initramfs mode detected, exit" && \

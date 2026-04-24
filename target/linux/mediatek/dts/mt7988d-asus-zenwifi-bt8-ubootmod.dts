@@ -3,7 +3,7 @@
 #include "mt7988d-asus-zenwifi-bt8.dtsi"
 
 / {
-	model = "ASUS ZenWiFi BT8 (U-Boot mod)";
+	model = "ASUS ZenWiFi BT8 (OpenWrt U-Boot layout)";
 	compatible = "asus,zenwifi-bt8-ubootmod", "mediatek,mt7988a";
 
 	chosen {
