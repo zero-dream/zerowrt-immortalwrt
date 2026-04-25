@@ -34,7 +34,7 @@ cudy,wr3000e-v1-ubootmod|\
 cudy,wr3000s-v1-ubootmod|\
 cudy,wr3000h-v1-ubootmod|\
 cudy,wr3000p-v1-ubootmod|\
-h3c,magic-nx30-pro|\
+h3c,magic-nx30-pro-ubootmod|\
 imou,hx21|\
 jcg,q30-pro|\
 livinet,zr-3020-ubootmod|\
@@ -76,10 +76,10 @@ nradio,c8-668gl)
 	ubootenv_add_mmc "u-boot-env" "" "0x0" "0x80000"
 	;;
 asiarf,ap7986-003|\
-cetron,ct3003|\
+cetron,ct3003-stock|\
 comfast,cf-wr632ax|\
 edgecore,eap111|\
-livinet,zr-3020|\
+livinet,zr-3020-stock|\
 netgear,wax220|\
 zbtlink,zbt-z8102ax|\
 zbtlink,zbt-z8103ax)
@@ -158,7 +158,7 @@ tplink,be450)
 ubnt,unifi-6-plus)
 	ubootenv_add_uci_config "/dev/mtd1" "0x0" "0x80000" "0x10000"
 	;;
-xiaomi,mi-router-ax3000t|\
+xiaomi,mi-router-ax3000t-stock|\
 xiaomi,mi-router-wr30u-stock|\
 xiaomi,redmi-router-ax6000-stock)
 	ubootenv_add_uci_config "/dev/mtd1" "0x0" "0x10000" "0x20000"

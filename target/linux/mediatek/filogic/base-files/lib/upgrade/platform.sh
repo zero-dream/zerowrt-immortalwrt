@@ -358,14 +358,19 @@ platform_check_image() {
 	mercusys,mr90x-v1-ubi|\
 	netcore,n60|\
 	netcore,n60-pro|\
+	netis,nx30v2|\
+	netis,nx31|\
 	netis,nx32u|\
 	nokia,ea0326gmp|\
 	openwrt,one|\
 	qihoo,360t7|\
 	routerich,ax3000-ubootmod|\
+	routerich,be7200|\
+	snr,snr-cpe-ax2|\
 	tplink,tl-7dr7230-v1|\
 	tplink,tl-7dr7230-v2|\
 	tplink,tl-7dr7250-v1|\
+	tplink,tl-7dr7299-v1|\
 	tplink,tl-xdr4288|\
 	tplink,tl-xdr6086|\
 	tplink,tl-xdr6088|\
@@ -373,7 +378,8 @@ platform_check_image() {
 	xiaomi,mi-router-ax3000t-ubootmod|\
 	xiaomi,mi-router-wr30u-ubootmod|\
 	xiaomi,redmi-router-ax6000-ubootmod|\
-	zyxel,ex5601-t0-ubootmod)
+	zyxel,ex5601-t0-ubootmod|\
+	zyxel,wx5600-t0-ubootmod)
 		fit_check_image "$1"
 		return $?
 		;;

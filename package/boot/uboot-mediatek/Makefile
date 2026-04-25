@@ -460,7 +460,7 @@ endef
 define U-Boot/mt7981_h3c_magic-nx30-pro
   NAME:=H3C Magic NX30 Pro
   BUILD_SUBTARGET:=filogic
-  BUILD_DEVICES:=h3c_magic-nx30-pro
+  BUILD_DEVICES:=h3c_magic-nx30-pro-ubootmod
   UBOOT_CONFIG:=mt7981_h3c_magic-nx30-pro
   UBOOT_IMAGE:=u-boot.fip
   BL2_BOOTDEV:=spim-nand
@@ -1181,6 +1181,18 @@ define U-Boot/mt7988_tplink_tl-7dr7250-v1
   DEPENDS:=+trusted-firmware-a-mt7988-spim-nand-ddr4
 endef
 
+define U-Boot/mt7988_tplink_tl-7dr7299-v1
+  NAME:=TP-Link TL-7DR7299 v1
+  BUILD_SUBTARGET:=filogic
+  BUILD_DEVICES:=tplink_tl-7dr7299-v1
+  UBOOT_CONFIG:=mt7988d_tplink_tl-7dr7299-v1
+  UBOOT_IMAGE:=u-boot.fip
+  BL2_BOOTDEV:=spim-nand
+  BL2_SOC:=mt7988
+  BL2_DDRTYPE:=ddr4
+  DEPENDS:=+trusted-firmware-a-mt7988-spim-nand-ddr4
+endef
+
 define U-Boot/mt7987_rfb-emmc
   NAME:=MT7987 Reference Board
   BUILD_SUBTARGET:=filogic
@@ -1381,6 +1393,7 @@ UBOOT_TARGETS := \
 	mt7988_tplink_tl-7dr7230-v1 \
 	mt7988_tplink_tl-7dr7230-v2 \
 	mt7988_tplink_tl-7dr7250-v1 \
+	mt7988_tplink_tl-7dr7299-v1 \
 	mt7988_rfb-spim-nand \
 	mt7988_rfb-snand \
 	mt7988_rfb-nor \
