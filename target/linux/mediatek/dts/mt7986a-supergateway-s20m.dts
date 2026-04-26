@@ -8,8 +8,8 @@
 	compatible = "supergateway,s20m", "mediatek,mt7986a";
 
 	gpio-leds {
-		/delete-node/ wlan5g_led;
-		/delete-node/ wlan2g_led;
+		/delete-node/ wlan5g-led;
+		/delete-node/ wlan2g-led;
 	};
 };
 
@@ -44,11 +44,6 @@
 			};
 		};
 	};
-};
-
-&pio {
-	/delete-node/ wf_2g_5g_pins;
-	/delete-node/ wf_dbdc_pins;
 };
 
 &wifi {

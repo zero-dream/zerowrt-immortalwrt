@@ -10,6 +10,19 @@
 	model = "TP-Link TL-7DR7299 v1";
 	compatible = "tplink,tl-7dr7299-v1", "mediatek,mt7988a";
 
+	cpus {
+		cpu3: cpu@3 {
+			compatible = "arm,cortex-a73";
+			reg = <0x3>;
+			device_type = "cpu";
+			enable-method = "psci";
+			clocks = <&mcusys CLK_MCU_ARM_DIV_SEL>, <&topckgen CLK_TOP_XTAL>;
+			clock-names = "cpu", "intermediate";
+			operating-points-v2 = <&cluster0_opp>;
+			mediatek,cci = <&cci>;
+		};
+	};
+
 	gpio-leds {
 		led-2 {
 			color = <LED_COLOR_ID_GREEN>;
