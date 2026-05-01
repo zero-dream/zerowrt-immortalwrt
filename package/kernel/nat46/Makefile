@@ -13,6 +13,7 @@ PKG_MAINTAINER:=Hans Dedecker <dedeckeh@gmail.com>
 PKG_LICENSE:=GPL-2.0
 
 PKG_BUILD_PARALLEL:=1
+PKG_EXTMOD_SUBDIRS:=nat46/modules
 
 include $(INCLUDE_DIR)/package.mk
 

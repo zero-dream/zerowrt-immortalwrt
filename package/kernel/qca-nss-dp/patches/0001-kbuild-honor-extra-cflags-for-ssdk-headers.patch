@@ -1,0 +1,10 @@
+--- a/Makefile
++++ b/Makefile
+@@ -118,6 +118,7 @@ ifeq ($(higher-address-support),y)
+ ccflags-y += -DEDMA_40BIT_SUPPORT
+ endif
+ 
+ ccflags-y += $(NSS_DP_INCLUDE)
++ccflags-y += $(EXTRA_CFLAGS)
+ ccflags-y += -Wall -Werror
+ ccflags-y += -DEDMA_DEBUG_LEVEL=2
