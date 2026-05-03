@@ -1,0 +1,54 @@
+--- a/arch/arm64/boot/dts/qcom/ipq6018-cp01-c1.dts
++++ b/arch/arm64/boot/dts/qcom/ipq6018-cp01-c1.dts
+@@ -7,7 +7,7 @@
+ 
+ /dts-v1/;
+ 
+-#include "ipq6018-mp5496.dtsi"
++#include "ipq6018.dtsi"
+ 
+ / {
+ 	model = "Qualcomm Technologies, Inc. IPQ6018/AP-CP01-C1";
+--- a/arch/arm64/boot/dts/qcom/ipq6018-mp5496.dtsi
++++ b/arch/arm64/boot/dts/qcom/ipq6018-mp5496.dtsi
+@@ -4,8 +4,6 @@
+  * apply to most devices that make use of the IPQ6018 SoC and MP5496 PMIC.
+  */
+ 
+-#include "ipq6018.dtsi"
+-
+ &cpu0 {
+ 	cpu-supply = <&mp5496_s2>;
+ };
+@@ -27,12 +25,14 @@
+ 		compatible = "qcom,rpm-mp5496-regulators";
+ 
+ 		mp5496_s2: s2 {
++			regulator-name = "vdd_s2";
+ 			regulator-min-microvolt = <725000>;
+ 			regulator-max-microvolt = <1062500>;
+ 			regulator-always-on;
+ 		};
+ 
+ 		mp5496_l2: l2 {
++			regulator-name = "vdd_l2";
+ 			regulator-min-microvolt = <1800000>;
+ 			regulator-max-microvolt = <3300000>;
+ 		};
+--- a/drivers/regulator/qcom_smd-regulator.c
++++ b/drivers/regulator/qcom_smd-regulator.c
+@@ -792,10 +792,10 @@ struct rpm_regulator_data {
+ };
+ 
+ static const struct rpm_regulator_data rpm_mp5496_regulators[] = {
+-	{ "s1", QCOM_SMD_RPM_SMPA, 1, &mp5496_smps, "s1" },
+-	{ "s2", QCOM_SMD_RPM_SMPA, 2, &mp5496_smps, "s2" },
+-	{ "l2", QCOM_SMD_RPM_LDOA, 2, &mp5496_ldoa2, "l2" },
+-	{ "l5", QCOM_SMD_RPM_LDOA, 5, &mp5496_ldoa2, "l5" },
++	{ "s1", QCOM_SMD_RPM_SMPA, 1, &mp5496_smps, "vdd_s1" },
++	{ "s2", QCOM_SMD_RPM_SMPA, 2, &mp5496_smps, "vdd_s2" },
++	{ "l2", QCOM_SMD_RPM_LDOA, 2, &mp5496_ldoa2, "vdd_l2" },
++	{ "l5", QCOM_SMD_RPM_LDOA, 5, &mp5496_ldoa2, "vdd_l5" },
+ 	{}
+ };
+ 
