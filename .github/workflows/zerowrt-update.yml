@@ -62,7 +62,7 @@ jobs:
           rm -rf "$immoRepoPath/.vscode/"
           cp -a "$updatePath/.vscode/" "$immoRepoPath/"
           # CopyReadme
-          rm -rf "$immoRepoPath/README.md"
+          mv "$immoRepoPath/README.md" "$immoRepoPath/README.md.bak"
           cp -a "$updatePath/README.md" "$immoRepoPath/README.md"
           # --------------------------------------------------
           # HandleGitDir
