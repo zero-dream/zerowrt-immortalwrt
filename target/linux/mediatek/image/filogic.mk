@@ -909,38 +909,6 @@ define Device/cetron_ct3003-ubootmod
 endef
 TARGET_DEVICES += cetron_ct3003-ubootmod
 
-define Device/supergateway_s20-common
-  DEVICE_VENDOR := Super Gateway
-  DEVICE_DTS_DIR := ../dts
-  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7916-firmware kmod-mt7986-firmware mt7986-wo-firmware \
-    kmod-usb3 kmod-mmc kmod-nvme kmod-fs-f2fs kmod-fs-ext4 kmod-fs-vfat \
-    mkf2fs f2fsck e2fsprogs blkid blockdev losetup automount
-  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
-endef
-
-define Device/supergateway_s20l
-  $(call Device/supergateway_s20-common)
-  DEVICE_MODEL := S20L
-  DEVICE_DTS := mt7986a-supergateway-s20l
-endef
-TARGET_DEVICES += supergateway_s20l
-
-define Device/supergateway_s20m
-  $(call Device/supergateway_s20-common)
-  DEVICE_MODEL := S20M
-  DEVICE_DTS := mt7986a-supergateway-s20m
-  DEVICE_PACKAGES += -kmod-mt76 -kmod-mt76-connac -kmod-mt76-core -kmod-mt7915e \
-    -kmod-mt7915-firmware -kmod-mt7916-firmware -kmod-mt7986-firmware -mt7986-wo-firmware
-endef
-TARGET_DEVICES += supergateway_s20m
-
-define Device/supergateway_s20p
-  $(call Device/supergateway_s20-common)
-  DEVICE_MODEL := S20P
-  DEVICE_DTS := mt7986a-supergateway-s20p
-endef
-TARGET_DEVICES += supergateway_s20p
-
 define Device/cmcc_a10-stock
   DEVICE_VENDOR := CMCC
   DEVICE_MODEL := A10
@@ -2923,10 +2891,8 @@ define Device/openwrt_one
 endef
 TARGET_DEVICES += openwrt_one
 
-define Device/qihoo_360t7
+define Device/qihoo_360t7-common
   DEVICE_VENDOR := Qihoo
-  DEVICE_MODEL := 360T7
-  DEVICE_DTS := mt7981b-qihoo-360t7
   DEVICE_DTS_DIR := ../dts
   UBINIZE_OPTS := -E 5
   BLOCKSIZE := 128k
@@ -2937,15 +2903,32 @@ define Device/qihoo_360t7
   KERNEL_INITRAMFS_SUFFIX := -recovery.itb
   KERNEL := kernel-bin | gzip
   KERNEL_INITRAMFS := kernel-bin | lzma | \
-	fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
+	fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | \
+	pad-to 64k
   IMAGE/sysupgrade.itb := append-kernel | \
-	fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb external-static-with-rootfs | append-metadata
+	fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb external-static-with-rootfs | \
+	append-metadata
   DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware
-  ARTIFACTS := preloader.bin bl31-uboot.fip
-  ARTIFACT/preloader.bin := mt7981-bl2 spim-nand-ddr3
+  ARTIFACTS := bl31-uboot.fip preloader.bin
+endef
+
+define Device/qihoo_360t7
+  DEVICE_MODEL := 360T7
+  DEVICE_DTS := mt7981b-qihoo-360t7
+  $(call Device/qihoo_360t7-common)
   ARTIFACT/bl31-uboot.fip := mt7981-bl31-uboot qihoo_360t7
+  ARTIFACT/preloader.bin  := mt7981-bl2 spim-nand-ddr3-1866
 endef
 TARGET_DEVICES += qihoo_360t7
+
+define Device/qihoo_360t7-ubi
+  DEVICE_MODEL := 360T7 (UBI)
+  DEVICE_DTS := mt7981b-qihoo-360t7-ubi
+  $(call Device/qihoo_360t7-common)
+  ARTIFACT/bl31-uboot.fip := mt7981-bl31-uboot qihoo_360t7-ubi
+  ARTIFACT/preloader.bin  := mt7981-bl2 spim-nand-ubi-ddr3-1866
+endef
+TARGET_DEVICES += qihoo_360t7-ubi
 
 define Device/routerich_ax3000
   DEVICE_VENDOR := Routerich
@@ -3899,3 +3882,35 @@ ifneq ($(CONFIG_TARGET_ROOTFS_INITRAMFS),)
 endif
 endef
 TARGET_DEVICES += zyxel_wx5600-t0-ubootmod
+
+define Device/supergateway_s20-common
+  DEVICE_VENDOR := Super Gateway
+  DEVICE_DTS_DIR := ../dts
+  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7916-firmware kmod-mt7986-firmware mt7986-wo-firmware \
+    kmod-usb3 kmod-mmc kmod-nvme kmod-fs-f2fs kmod-fs-ext4 kmod-fs-vfat \
+    mkf2fs f2fsck e2fsprogs blkid blockdev losetup automount
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+endef
+
+define Device/supergateway_s20l
+  $(call Device/supergateway_s20-common)
+  DEVICE_MODEL := S20L
+  DEVICE_DTS := mt7986a-supergateway-s20l
+endef
+TARGET_DEVICES += supergateway_s20l
+
+define Device/supergateway_s20m
+  $(call Device/supergateway_s20-common)
+  DEVICE_MODEL := S20M
+  DEVICE_DTS := mt7986a-supergateway-s20m
+  DEVICE_PACKAGES += -kmod-mt76 -kmod-mt76-connac -kmod-mt76-core -kmod-mt7915e \
+    -kmod-mt7915-firmware -kmod-mt7916-firmware -kmod-mt7986-firmware -mt7986-wo-firmware
+endef
+TARGET_DEVICES += supergateway_s20m
+
+define Device/supergateway_s20p
+  $(call Device/supergateway_s20-common)
+  DEVICE_MODEL := S20P
+  DEVICE_DTS := mt7986a-supergateway-s20p
+endef
+TARGET_DEVICES += supergateway_s20p
