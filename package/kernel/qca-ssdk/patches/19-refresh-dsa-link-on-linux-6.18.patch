@@ -71,7 +71,7 @@
  			if ((cfg.chip_type == CHIP_SCOMPHY) &&
  				(cfg.phy_id == MP_GEPHY)) {
  				if ((p_api == NULL) || (p_api->adpt_port_netdev_notify_set == NULL)
-@@ -1774,8 +1821,8 @@ static int ssdk_dev_event(struct notifie
+@@ -1774,11 +1821,14 @@ static int ssdk_dev_event(struct notifie
  					}
  				}
  			}
@@ -81,3 +81,9 @@
  		case NETDEV_REGISTER:
  			if (strstr(dev->name, "eth") && !(dev->priv_flags & IFF_802_1Q_VLAN))
  				ssdk_netdev_switch_init(dev);
++#if IS_ENABLED(CONFIG_NET_DSA) && (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0))
++				ssdk_dsa_netdev_link_refresh(dev);
++#endif
+ 			break;
+ 	}
+ 
