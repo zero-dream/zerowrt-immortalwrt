@@ -19,14 +19,13 @@
 	compatible = "xiaomi,ax9000", "qcom,ipq8074";
 
 	aliases {
+		label-mac-device = &dp5_syn;
 		serial0 = &blsp1_uart5;
 
 		led-boot = &led_system_yellow;
 		led-failsafe = &led_system_yellow;
 		led-running = &led_system_blue;
 		led-upgrade = &led_system_yellow;
-
-		label-mac-device = &dp5;
 	};
 
 	chosen {
@@ -460,7 +459,6 @@
 
 &dp1 {
 	status = "okay";
-	phy-mode = "qsgmii";
 	phy-handle = <&qca8075_0>;
 	label = "lan4";
 	nvmem-cells = <&macaddr_dp1>;
@@ -469,7 +467,6 @@
 
 &dp2 {
 	status = "okay";
-	phy-mode = "qsgmii";
 	phy-handle = <&qca8075_1>;
 	label = "lan3";
 	nvmem-cells = <&macaddr_dp2>;
@@ -478,7 +475,6 @@
 
 &dp3 {
 	status = "okay";
-	phy-mode = "qsgmii";
 	phy-handle = <&qca8075_2>;
 	label = "lan2";
 	nvmem-cells = <&macaddr_dp3>;
@@ -487,16 +483,14 @@
 
 &dp4 {
 	status = "okay";
-	phy-mode = "qsgmii";
 	phy-handle = <&qca8075_3>;
 	label = "lan1";
 	nvmem-cells = <&macaddr_dp4>;
 	nvmem-cell-names = "mac-address";
 };
 
-&dp5 {
+&dp5_syn {
 	status = "okay";
-	phy-mode = "sgmii";
 	phy-handle = <&qca8081>;
 	label = "wan";
 	nvmem-cells = <&macaddr_dp5>;

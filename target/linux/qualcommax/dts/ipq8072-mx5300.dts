@@ -17,13 +17,13 @@
 	compatible = "linksys,mx5300", "qcom,ipq8074";
 
 	aliases {
+		label-mac-device = &dp2;
 		serial0 = &blsp1_uart5;
 
 		led-boot = &led_system_blue;
 		led-running = &led_system_blue;
 		led-failsafe = &led_system_red;
 		led-upgrade = &led_system_green;
-		label-mac-device = &dp2;
 	};
 
 	chosen {

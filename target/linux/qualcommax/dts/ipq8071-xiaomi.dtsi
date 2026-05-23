@@ -13,14 +13,13 @@
 
 / {
 	aliases {
+		label-mac-device = &dp2;
 		serial0 = &blsp1_uart5;
 
 		led-boot = &led_system_yellow;
 		led-failsafe = &led_system_yellow;
 		led-running = &led_system_blue;
 		led-upgrade = &led_system_yellow;
-
-		label-mac-device = &dp2;
 	};
 
 	chosen {
