@@ -278,7 +278,7 @@
 						reg = <0x12 0x6>;
 					};
 
-					macaddr_dp5: macaddr@18 {
+					macaddr_dp5_syn: macaddr@18 {
 						reg = <0x18 0x6>;
 					};
 
@@ -493,7 +493,7 @@
 	status = "okay";
 	phy-handle = <&qca8081>;
 	label = "wan";
-	nvmem-cells = <&macaddr_dp5>;
+	nvmem-cells = <&macaddr_dp5_syn>;
 	nvmem-cell-names = "mac-address";
 };
 
