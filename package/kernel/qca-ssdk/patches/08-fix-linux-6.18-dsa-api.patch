@@ -1,16 +1,6 @@
 --- a/src/init/ssdk_init.c
 +++ b/src/init/ssdk_init.c
-@@ -52,6 +52,9 @@
- #include <linux/gpio.h>
- #include <linux/of_gpio.h>
- #include <net/dsa.h>
-+#if IS_ENABLED(CONFIG_NET_DSA) && (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0))
-+#include <net/rtnetlink.h>
-+#endif
- 
- #if defined(IN_SWCONFIG)
- #include <linux/switch.h>
-@@ -62,6 +65,10 @@
+@@ -62,6 +62,10 @@
  #include <linux/of_net.h>
  #include <linux/of_address.h>
  #include <linux/reset.h>
@@ -21,7 +11,7 @@
  #include "ssdk_plat.h"
  /*qca808x_end*/
  #include "ssdk_clk.h"
-@@ -1269,7 +1276,7 @@ static int qca_switchdev_register(struct
+@@ -1269,7 +1273,7 @@ static int qca_switchdev_register(struct
  }
  #endif
  
@@ -30,104 +20,88 @@
  static int ssdk_dsa_event_link_change(struct net_device *dev, bool link)
  {
  	struct dsa_port *dp = NULL;
-@@ -1315,6 +1322,100 @@ static int ssdk_dsa_event_nb(struct noti
- static struct notifier_block ssdk_dsa_notifier_nb = {
- 	.notifier_call = ssdk_dsa_event_nb,
- };
-+#elif IS_ENABLED(CONFIG_NET_DSA) && (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0))
-+static int ssdk_dsa_phylink_notifier_refs;
-+
-+static int ssdk_dsa_phylink_event_nb(struct notifier_block *unused,
-+		unsigned long event, void *ptr)
-+{
-+	ssdk_port_status *status = ptr;
-+	struct net_device *dev;
-+	int notified = NOTIFY_DONE;
-+
-+	(void)unused;
-+	(void)event;
-+
-+	if (!status)
-+		return NOTIFY_DONE;
-+
-+	rtnl_lock();
-+
-+	for_each_netdev(&init_net, dev) {
-+		ssdk_netdev_switch_t *netdev_switch = NULL;
-+		struct qca_phy_priv* priv = NULL;
-+		struct net_device *conduit = NULL;
-+		struct dsa_port *dp = NULL;
-+
-+		if (!dsa_user_dev_check(dev))
-+			continue;
-+
-+		dp = dsa_port_from_netdev(dev);
-+		if (!dp || !dp->ds || !dp->cpu_dp || !dp->pl)
-+			continue;
-+
-+		if (dp->index != status->port_id)
-+			continue;
-+
-+		conduit = dsa_port_to_conduit(dp);
-+		if (!conduit)
-+			continue;
-+
-+		netdev_switch = ssdk_dts_netdev_switch_find_by_netdev(conduit);
-+		if (!netdev_switch)
-+			continue;
-+
-+		priv = ssdk_phy_priv_data_get(netdev_switch->switch_dev_id);
-+		if (!priv)
-+			continue;
-+
-+		if (priv->version != QCA_VER_MHT &&
-+			priv->version != QCA_VER_AR8337 &&
-+			priv->version != QCA_VER_AR8327)
-+			continue;
-+
-+		dsa_port_phylink_mac_change(dp->ds, dp->index,
-+				status->port_link);
-+		notified = NOTIFY_OK;
-+		break;
-+	}
-+
-+	rtnl_unlock();
-+
-+	return notified;
-+}
-+
-+static struct notifier_block ssdk_dsa_phylink_notifier_nb = {
-+	.notifier_call = ssdk_dsa_phylink_event_nb,
-+};
-+
-+static void ssdk_dsa_phylink_notifier_register(void)
-+{
-+	int ret;
-+
-+	if (ssdk_dsa_phylink_notifier_refs) {
-+		ssdk_dsa_phylink_notifier_refs++;
-+		return;
-+	}
-+
-+	ret = ssdk_port_link_notify_register(&ssdk_dsa_phylink_notifier_nb);
-+	if (ret) {
-+		SSDK_ERROR("register ssdk dsa phylink notifier failed: %d\n", ret);
-+		return;
-+	}
-+
-+	ssdk_dsa_phylink_notifier_refs = 1;
-+}
-+
-+static void ssdk_dsa_phylink_notifier_unregister(void)
-+{
-+	if (!ssdk_dsa_phylink_notifier_refs)
-+		return;
-+
-+	if (--ssdk_dsa_phylink_notifier_refs)
-+		return;
-+
-+	ssdk_port_link_notify_unregister(&ssdk_dsa_phylink_notifier_nb);
-+}
+@@ -1436,7 +1440,7 @@ static int ssdk_switch_register(a_uint32
+ 		}
+ 	}
+ 
+-#if IS_ENABLED(CONFIG_NET_DSA)
++#if IS_ENABLED(CONFIG_NET_DSA) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 18, 0))
+ 	if (priv->version == QCA_VER_MHT ||
+ 		priv->version == QCA_VER_AR8337 ||
+ 		priv->version == QCA_VER_AR8327)
+@@ -1466,7 +1470,7 @@ static int ssdk_switch_unregister(a_uint
+ 	unregister_switch(&qca_phy_priv_global[dev_id]->sw_dev);
  #endif
  
- #if defined(DESS) || defined(HPPE) || defined (ISISC) || defined (ISIS) || defined(MP) || defined(MHT)
+-#if IS_ENABLED(CONFIG_NET_DSA)
++#if IS_ENABLED(CONFIG_NET_DSA) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 18, 0))
+ 	if (priv->version == QCA_VER_MHT ||
+ 		priv->version == QCA_VER_AR8337 ||
+ 		priv->version == QCA_VER_AR8327)
+@@ -1706,6 +1710,43 @@ static void ssdk_cfg_default_init(ssdk_i
+ }
+ /*qca808x_end*/
+ 
++#if IS_ENABLED(CONFIG_NET_DSA) && (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0))
++static void ssdk_dsa_refresh_link_polling(struct net_device *dev)
++{
++	struct dsa_port *dp = NULL;
++	struct net_device *conduit = NULL;
++	ssdk_netdev_switch_t *netdev_switch = NULL;
++	struct qca_phy_priv *priv = NULL;
++
++	if (!dsa_user_dev_check(dev))
++		return;
++
++	dp = dsa_port_from_netdev(dev);
++	if (!dp)
++		return;
++
++	conduit = dsa_port_to_conduit(dp);
++	if (!conduit)
++		return;
++
++	netdev_switch = ssdk_dts_netdev_switch_find_by_netdev(conduit);
++	if (!netdev_switch)
++		return;
++
++	priv = ssdk_phy_priv_data_get(netdev_switch->switch_dev_id);
++	if (!priv)
++		return;
++
++	if (priv->version != QCA_VER_MHT &&
++	    priv->version != QCA_VER_AR8337 &&
++	    priv->version != QCA_VER_AR8327)
++		return;
++
++	priv->polling_once = A_TRUE;
++	mod_delayed_work(system_wq, &priv->qm_dwork_polling, 0);
++}
++#endif
++
+ //#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+ static int ssdk_dev_event(struct notifier_block *this, unsigned long event, void *ptr)
+ {
+@@ -1751,8 +1792,11 @@ static int ssdk_dev_event(struct notifie
+ 				}
+ 			}
+ 			break;
+-#ifdef MP
+ 		case NETDEV_CHANGE:
++#if IS_ENABLED(CONFIG_NET_DSA) && (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0))
++			ssdk_dsa_refresh_link_polling(dev);
++#endif
++#ifdef MP
+ 			if ((cfg.chip_type == CHIP_SCOMPHY) &&
+ 				(cfg.phy_id == MP_GEPHY)) {
+ 				if ((p_api == NULL) || (p_api->adpt_port_netdev_notify_set == NULL)
+@@ -1770,8 +1814,8 @@ static int ssdk_dev_event(struct notifie
+ 					}
+ 				}
+ 			}
+-			break;
+ #endif
++			break;
+ 		case NETDEV_REGISTER:
+ 			if (strstr(dev->name, "eth") && !(dev->priv_flags & IFF_802_1Q_VLAN))
+ 				ssdk_netdev_switch_init(dev);
