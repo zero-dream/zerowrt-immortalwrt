@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+
+/dts-v1/;
+#include "mt7981b-tplink-wma301-v2-common.dtsi"
+
+/ {
+	model = "TP-Link WMA301 v2";
+	compatible = "tplink,wma301-v2", "mediatek,mt7981";
+};
+
+&partitions {
+	partition@580000 {
+		label = "ubi";
+		compatible = "linux,ubi";
+		reg = <0x0580000 0x7200000>;
+	};
+};
+
+&spi_nand {
+	mediatek,nmbm;
+	mediatek,bmt-max-ratio = <1>;
+	mediatek,bmt-max-reserved-blocks = <64>;
+};
