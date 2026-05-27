@@ -71,8 +71,7 @@ mediatek_setup_interfaces()
 	routerich,be7200|\
 	tenbay,wr3000k|\
 	tplink,tl-7dr7250-v1|\
-	tplink,wma301-v2|\
-	tplink,wma301-v2-256m)
+	tplink,wma301-v2*)
 		ucidef_set_interfaces_lan_wan "lan1 lan2 lan3" wan
 		;;
 	acer,predator-w6x-stock|\

@@ -246,8 +246,7 @@ platform_do_upgrade() {
 	huasifei,wh3000-pro-nand|\
 	huasifei,wh3000r-nand|\
 	jiorouter,ax6000-jidu6101|\
-	tplink,wma301-v2|\
-	tplink,wma301-v2-256m)
+	tplink,wma301-v2*)
 		CI_UBIPART="ubi"
 		nand_do_upgrade "$1"
 		;;
