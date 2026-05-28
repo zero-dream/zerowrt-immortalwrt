@@ -4033,49 +4033,56 @@ define Device/supergateway_s20p
 endef
 TARGET_DEVICES += supergateway_s20p
 
-define Device/tplink_wma301-v2-common
+define Device/tplink_wma301-common
   DEVICE_VENDOR := TP-Link
   DEVICE_MODEL := WMA301
   DEVICE_DTS_DIR := ../dts
   DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware
-  SUPPORTED_DEVICES += mediatek,mt7981-spim-snand-rfb
-  KERNEL_IN_UBI := 1
   UBINIZE_OPTS := -E 5
   BLOCKSIZE := 128k
   PAGESIZE := 2048
-  IMAGES += factory.bin
-  IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE)
-  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+  KERNEL_IN_UBI := 1
+  UBOOTENV_IN_UBI := 1
+  IMAGES := sysupgrade.itb
+  KERNEL_INITRAMFS_SUFFIX := -recovery.itb
+  KERNEL := kernel-bin | gzip
+  KERNEL_INITRAMFS := kernel-bin | lzma | \
+	fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
+  IMAGE/sysupgrade.itb := append-kernel | \
+	fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb external-static-with-rootfs | append-metadata
+  ARTIFACTS := preloader.bin bl31-uboot.fip
+  ARTIFACT/preloader.bin := mt7981-bl2 spim-nand-ddr3
 endef
+TARGET_DEVICES += tplink_wma301-common
 
-define Device/tplink_wma301-v2
-  $(call Device/tplink_wma301-v2-common)
+define Device/tplink_wma301-v2-ubootmod
+  $(call Device/tplink_wma301-common)
   DEVICE_VARIANT := v2.0
-  DEVICE_DTS := mt7981b-tplink-wma301-v2
-  IMAGE_SIZE := 114688k
+  DEVICE_DTS := mt7981b-tplink-wma301-v2-ubootmod
+  ARTIFACT/bl31-uboot.fip := mt7981-bl31-uboot tplink_wma301-v2
 endef
-TARGET_DEVICES += tplink_wma301-v2
+TARGET_DEVICES += tplink_wma301-v2-ubootmod
 
-define Device/tplink_wma301-v2-256m
-  $(call Device/tplink_wma301-v2-common)
+define Device/tplink_wma301-v2-256m-ubootmod
+  $(call Device/tplink_wma301-common)
   DEVICE_VARIANT := v2.0 (256M)
-  DEVICE_DTS := mt7981b-tplink-wma301-v2-256m
-  IMAGE_SIZE := 235520k
+  DEVICE_DTS := mt7981b-tplink-wma301-v2-256m-ubootmod
+  ARTIFACT/bl31-uboot.fip := mt7981-bl31-uboot tplink_wma301-v2-256m
 endef
-TARGET_DEVICES += tplink_wma301-v2-256m
+TARGET_DEVICES += tplink_wma301-v2-256m-ubootmod
 
-define Device/tplink_wma301-v2-1
-  $(call Device/tplink_wma301-v2-common)
+define Device/tplink_wma301-v2-1-ubootmod
+  $(call Device/tplink_wma301-common)
   DEVICE_VARIANT := v2.1
-  DEVICE_DTS := mt7981b-tplink-wma301-v2-1
-  IMAGE_SIZE := 114688k
+  DEVICE_DTS := mt7981b-tplink-wma301-v2-1-ubootmod
+  ARTIFACT/bl31-uboot.fip := mt7981-bl31-uboot tplink_wma301-v2-1
 endef
-TARGET_DEVICES += tplink_wma301-v2-1
+TARGET_DEVICES += tplink_wma301-v2-1-ubootmod
 
-define Device/tplink_wma301-v2-1-256m
-  $(call Device/tplink_wma301-v2-common)
+define Device/tplink_wma301-v2-1-256m-ubootmod
+  $(call Device/tplink_wma301-common)
   DEVICE_VARIANT := v2.1 (256M)
-  DEVICE_DTS := mt7981b-tplink-wma301-v2-1-256m
-  IMAGE_SIZE := 235520k
+  DEVICE_DTS := mt7981b-tplink-wma301-v2-1-256m-ubootmod
+  ARTIFACT/bl31-uboot.fip := mt7981-bl31-uboot tplink_wma301-v2-1-256m
 endef
-TARGET_DEVICES += tplink_wma301-v2-1-256m
+TARGET_DEVICES += tplink_wma301-v2-1-256m-ubootmod
