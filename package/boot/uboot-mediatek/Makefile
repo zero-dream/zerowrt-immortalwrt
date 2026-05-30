@@ -766,10 +766,9 @@ define U-Boot/mt7981_tplink_wma301-v2
   BUILD_DEVICES:=tplink_wma301-v2-ubootmod
   UBOOT_CONFIG:=mt7981_tplink_wma301-v2
   UBOOT_IMAGE:=u-boot.fip
-  BL2_BOOTDEV:=spim-nand
+  BL2_BOOTDEV:=wma301-v2-ddr3
   BL2_SOC:=mt7981
-  BL2_DDRTYPE:=ddr3
-  DEPENDS:=+trusted-firmware-a-mt7981-spim-nand-ddr3
+  DEPENDS:=+trusted-firmware-a-mt7981-wma301-v2-ddr3
 endef
 
 define U-Boot/mt7981_tplink_wma301-v2-256m
@@ -778,10 +777,9 @@ define U-Boot/mt7981_tplink_wma301-v2-256m
   BUILD_DEVICES:=tplink_wma301-v2-256m-ubootmod
   UBOOT_CONFIG:=mt7981_tplink_wma301-v2-256m
   UBOOT_IMAGE:=u-boot.fip
-  BL2_BOOTDEV:=spim-nand
+  BL2_BOOTDEV:=wma301-v2-ddr3
   BL2_SOC:=mt7981
-  BL2_DDRTYPE:=ddr3
-  DEPENDS:=+trusted-firmware-a-mt7981-spim-nand-ddr3
+  DEPENDS:=+trusted-firmware-a-mt7981-wma301-v2-ddr3
 endef
 
 define U-Boot/mt7981_tplink_wma301-v2-1
@@ -790,10 +788,9 @@ define U-Boot/mt7981_tplink_wma301-v2-1
   BUILD_DEVICES:=tplink_wma301-v2-1-ubootmod
   UBOOT_CONFIG:=mt7981_tplink_wma301-v2-1
   UBOOT_IMAGE:=u-boot.fip
-  BL2_BOOTDEV:=spim-nand
+  BL2_BOOTDEV:=wma301-v2-ddr3
   BL2_SOC:=mt7981
-  BL2_DDRTYPE:=ddr3
-  DEPENDS:=+trusted-firmware-a-mt7981-spim-nand-ddr3
+  DEPENDS:=+trusted-firmware-a-mt7981-wma301-v2-ddr3
 endef
 
 define U-Boot/mt7981_tplink_wma301-v2-1-256m
@@ -802,10 +799,9 @@ define U-Boot/mt7981_tplink_wma301-v2-1-256m
   BUILD_DEVICES:=tplink_wma301-v2-1-256m-ubootmod
   UBOOT_CONFIG:=mt7981_tplink_wma301-v2-1-256m
   UBOOT_IMAGE:=u-boot.fip
-  BL2_BOOTDEV:=spim-nand
+  BL2_BOOTDEV:=wma301-v2-ddr3
   BL2_SOC:=mt7981
-  BL2_DDRTYPE:=ddr3
-  DEPENDS:=+trusted-firmware-a-mt7981-spim-nand-ddr3
+  DEPENDS:=+trusted-firmware-a-mt7981-wma301-v2-ddr3
 endef
 
 define U-Boot/mt7981_wavlink_wl-wnt100x3
