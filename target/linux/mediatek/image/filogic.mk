@@ -4060,7 +4060,7 @@ endef
 TARGET_DEVICES += tplink_wma301-v2-ubootmod
 
 define Device/tplink_wma301-v2-256m-ubootmod
-  DEVICE_VARIANT := v2.0 (256M)
+  DEVICE_VARIANT := v2.0 (256M / OpenWrt U-Boot layout)
   DEVICE_DTS := mt7981b-tplink-wma301-v2-256m-ubootmod
   ARTIFACT/bl31-uboot.fip := mt7981-bl31-uboot tplink_wma301-v2-256m
   $(call Device/tplink_wma301-common)
@@ -4076,7 +4076,7 @@ endef
 TARGET_DEVICES += tplink_wma301-v2-1-ubootmod
 
 define Device/tplink_wma301-v2-1-256m-ubootmod
-  DEVICE_VARIANT := v2.1 (256M)
+  DEVICE_VARIANT := v2.1 (256M / OpenWrt U-Boot layout)
   DEVICE_DTS := mt7981b-tplink-wma301-v2-1-256m-ubootmod
   ARTIFACT/bl31-uboot.fip := mt7981-bl31-uboot tplink_wma301-v2-1-256m
   $(call Device/tplink_wma301-common)
