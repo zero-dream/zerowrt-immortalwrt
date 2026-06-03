@@ -1,6 +1,15 @@
 --- a/nss_dp_main.c
 +++ b/nss_dp_main.c
-@@ -42,6 +42,7 @@
+@@ -38,10 +38,16 @@
+ #if (LINUX_VERSION_CODE > KERNEL_VERSION(6, 6, 0))
+ #include <net/netdev_rx_queue.h>
+ #endif
++#ifdef CONFIG_RFS_ACCEL
++#include <linux/hash.h>
++#include <net/hotdata.h>
++#include <net/rps.h>
++#endif
+ #if defined(NSS_DP_MAC_POLL_SUPPORT)
  #include <init/ssdk_init.h>
  #endif
  #include "nss_dp_hal.h"
@@ -8,107 +17,28 @@
  
  #define JUMBO_MRU_3K 3072
  
-@@ -510,89 +511,6 @@ static int nss_dp_open(struct net_device
- 	return 0;
- }
+@@ -550,17 +556,17 @@ static int nss_dp_rx_flow_steer(struct n
+ 	}
  
--#ifdef CONFIG_RFS_ACCEL
--/*
-- * nss_dp_rx_flow_steer()
-- *	Steer the flow rule to NSS
-- */
--static int nss_dp_rx_flow_steer(struct net_device *netdev, const struct sk_buff *_skb,
--				uint16_t rxq, uint32_t flow)
--{
--	struct nss_dp_dev *dp_priv;
--	struct netdev_rx_queue *rxqueue;
--	struct rps_sock_flow_table *sock_flow_table;
--	struct rps_dev_flow_table *flow_table;
--	struct rps_dev_flow *rxflow;
--	struct sk_buff *skb = (struct sk_buff *)_skb;
--	uint16_t index;
--	uint32_t hash;
--	uint32_t rfscpu;
--	uint32_t rxcpu;
--
--	if (!netdev)
--		return -EINVAL;
--
--	dp_priv = (struct nss_dp_dev *)netdev_priv(netdev);
--	if (!dp_priv)
--		return -EINVAL;
--
--	rxqueue = netdev->_rx;
--
--	if (skb_rx_queue_recorded(skb)) {
--		index = skb_get_rx_queue(skb);
--		rxqueue += index;
--	}
--
--	flow_table = rcu_dereference(rxqueue->rps_flow_table);
--	if (!flow_table) {
--		netdev_dbg(netdev, "RX queue RPS flow table not found\n");
--		return -EINVAL;
--	}
--
--	hash = skb_get_hash(skb);
+ 	hash = skb_get_hash(skb);
 -	rxflow = &flow_table->flows[hash & flow_table->mask];
--	rxcpu = (uint32_t)rxflow->cpu;
--
++	rxflow = &flow_table->flows[hash_32(hash, flow_table->log)];
+ 	rxcpu = (uint32_t)rxflow->cpu;
+ 
 -	sock_flow_table = rcu_dereference(rps_sock_flow_table);
--	if (!sock_flow_table) {
--		netdev_dbg(netdev, "Global RPS flow table not found\n");
--		return -EINVAL;
--	}
--
--	rfscpu = sock_flow_table->ents[hash & sock_flow_table->mask];
++	sock_flow_table = rcu_dereference(net_hotdata.rps_sock_flow_table);
+ 	if (!sock_flow_table) {
+ 		netdev_dbg(netdev, "Global RPS flow table not found\n");
+ 		return -EINVAL;
+ 	}
+ 
+ 	rfscpu = sock_flow_table->ents[hash & sock_flow_table->mask];
 -	rfscpu &= rps_cpu_mask;
--
--	if (rxcpu == rfscpu)
--		return 0;
--
--	/*
--	 * check rx_flow_steer is defined in data plane ops
--	 */
--	if (!dp_priv->data_plane_ops->rx_flow_steer) {
--		netdev_dbg(netdev, "Data plane ops not defined for flow steer\n");
--		return -EINVAL;
--	}
--
--	/*
--	 * Delete the old flow rule
--	 */
--	if (dp_priv->data_plane_ops->rx_flow_steer(dp_priv->dpc, skb, rxcpu, false)) {
--		netdev_dbg(netdev, "Data plane delete flow rule failed\n");
--		return -EAGAIN;
--	}
--
--	/*
--	 * Add the new flow rule
--	 */
--	if (dp_priv->data_plane_ops->rx_flow_steer(dp_priv->dpc, skb, rfscpu, true)) {
--		netdev_dbg(netdev, "Data plane add flow rule failed\n");
--		return -EAGAIN;
--	}
--
--	return 0;
--}
--#endif
--
- /*
-  * nss_dp_select_queue()
-  *	Select tx queue
-@@ -679,9 +597,6 @@ struct net_device_ops nss_dp_netdev_ops
- 	.ndo_select_queue = nss_dp_select_queue,
- #endif
++	rfscpu &= net_hotdata.rps_cpu_mask;
  
--#ifdef CONFIG_RFS_ACCEL
--	.ndo_rx_flow_steer = nss_dp_rx_flow_steer,
--#endif
- };
- 
- /*
-@@ -911,7 +826,7 @@ bool nss_dp_is_phy_dev(struct net_device
+ 	if (rxcpu == rfscpu)
+ 		return 0;
+@@ -911,7 +917,7 @@ bool nss_dp_is_phy_dev(struct net_device
  /*
   * nss_dp_adjust_link()
   */
@@ -117,7 +47,7 @@
  {
  	struct nss_dp_dev *dp_priv = netdev_priv(netdev);
  	int current_state = dp_priv->link_state;
-@@ -1130,7 +1045,7 @@ fail:
+@@ -1130,7 +1136,7 @@ fail:
   * Note: We only remove the physical ports here. Virtual
   * port devices are removed explicitly by the VP module.
   */
@@ -126,15 +56,16 @@
  {
  	uint32_t i;
  	struct nss_dp_dev *dp_priv;
-@@ -1177,7 +1092,6 @@ static int nss_dp_remove(struct platform
+@@ -1176,8 +1182,6 @@ static int nss_dp_remove(struct platform
+ 		free_netdev(dp_priv->netdev);
  		dp_global_ctx.nss_dp[i] = NULL;
  	}
- 
+-
 -	return 0;
  }
  
  static struct of_device_id nss_dp_dt_ids[] = {
-@@ -1260,7 +1174,7 @@ EXPORT_SYMBOL(nss_dp_nsm_sawf_sc_stats_r
+@@ -1260,7 +1264,7 @@ EXPORT_SYMBOL(nss_dp_nsm_sawf_sc_stats_r
  /*
   * nss_dp_init()
   */
@@ -143,7 +74,7 @@
  {
  	int ret, i;
  
-@@ -1348,7 +1262,7 @@ int __init nss_dp_init(void)
+@@ -1348,7 +1352,7 @@ int __init nss_dp_init(void)
  /*
   * nss_dp_exit()
   */
@@ -152,3 +83,8 @@
  {
  	/*
  	 * Ensure netdev remove is done before HAL cleanup.
+@@ -1366,3 +1370,4 @@ module_exit(nss_dp_exit);
+ 
+ MODULE_LICENSE("Dual BSD/GPL");
+ MODULE_DESCRIPTION("NSS Data Plane Network Driver");
++MODULE_INFO(description, "NSS Data Plane Network Driver");
