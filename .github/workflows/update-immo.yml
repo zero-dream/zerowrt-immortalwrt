@@ -1,5 +1,5 @@
 # CI 项目
-name: auto-update
+name: update-immo
 
 # CI 权限
 permissions: write-all

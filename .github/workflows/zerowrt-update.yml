@@ -74,5 +74,5 @@ jobs:
           # DeleteImmoRepoPath
           rm -rf "$immoRepoPath/"
           # PushRepo
-          commit=$ZD_Date
+          commit=$ZD_DateUTC
           pushRepo "$commit"
