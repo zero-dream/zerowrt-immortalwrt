@@ -18,6 +18,10 @@
 
 https://github.com/VIKINGYFY/OWRT-Tools.git
 
+# 自用修改版插件
+
+https://github.com/VIKINGYFY/packages.git
+
 # 分支说明
 
 main 为高通专用，无法编译其他平台，带满血NSS驱动。
