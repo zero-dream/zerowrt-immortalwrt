@@ -110,6 +110,25 @@
 
 		partitions {
 			compatible = "qcom,smem-part";
+
+			partition-0-art {
+				label = "0:art";
+				read-only;
+
+				nvmem-layout {
+					compatible = "fixed-layout";
+					#address-cells = <1>;
+					#size-cells = <1>;
+
+					macaddr_wan: macaddr@0 {
+						reg = <0x0 0x6>;
+					};
+
+					macaddr_lan: macaddr@6 {
+						reg = <0x6 0x6>;
+					};
+				};
+			};
 		};
 	};
 };
