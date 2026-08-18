@@ -268,7 +268,7 @@
  	bond_set_carrier(bond);
  }
  
-@@ -4093,9 +4179,316 @@ static inline u32 bond_eth_hash(struct s
+@@ -4094,9 +4180,316 @@ static inline u32 bond_eth_hash(struct s
  		return 0;
  
  	ep = (struct ethhdr *)(data + mhoff);
@@ -586,7 +586,7 @@
  static bool bond_flow_ip(struct sk_buff *skb, struct flow_keys *fk, const void *data,
  			 int hlen, __be16 l2_proto, int *nhoff, int *ip_proto, bool l34)
  {
-@@ -5272,15 +5665,18 @@ static netdev_tx_t bond_3ad_xor_xmit(str
+@@ -5273,15 +5666,18 @@ static netdev_tx_t bond_3ad_xor_xmit(str
  				     struct net_device *dev)
  {
  	struct bonding *bond = netdev_priv(dev);
@@ -612,7 +612,7 @@
  }
  
  /* in broadcast mode, we send everything to all or usable slave interfaces.
-@@ -5545,7 +5941,7 @@ static netdev_tx_t __bond_start_xmit(str
+@@ -5546,7 +5942,7 @@ static netdev_tx_t __bond_start_xmit(str
  			return bond_xmit_broadcast(skb, dev, false);
  		fallthrough;
  	case BOND_MODE_XOR:
