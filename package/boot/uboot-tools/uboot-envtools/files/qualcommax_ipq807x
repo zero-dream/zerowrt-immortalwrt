@@ -27,11 +27,9 @@ ubootenv_mtdinfo () {
 }
 
 case "$board" in
-arista,c260|\
-arista,c360)
-	ubootenv_add_mtd "0:APPSBLENV" "0x0" "0x10000" "0x10000"
-	;;
 aliyun,ap8220|\
+arista,c260|\
+arista,c360|\
 compex,wpq873|\
 edgecore,eap102|\
 zyxel,nbg7815|\

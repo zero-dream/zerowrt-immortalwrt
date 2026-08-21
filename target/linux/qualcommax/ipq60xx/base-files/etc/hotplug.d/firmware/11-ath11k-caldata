@@ -13,14 +13,12 @@ case "$FIRMWARE" in
 	alfa-network,ap120c-ax)
 		caldata_extract "0:ART" 0x1000 0x20000
 		;;
-	anysafe,e1|\
-	cambiumnetworks,xe3-4|\
-	dptech,ap3000-2c|\
-	philips,ly1800|\
-	sy,y6010)
+	cambiumnetworks,xe3-4)
 		caldata_extract "0:ART" 0x1000 0x10000
 		;;
+	anysafe,e1|\
 	cmiot,ax18|\
+	dptech,ap3000-2c|\
 	glinet,gl-ax1800|\
 	glinet,gl-axt1800|\
 	linksys,mr7350|\
@@ -28,10 +26,12 @@ case "$FIRMWARE" in
 	netgear,rbr350|\
 	netgear,rbs350|\
 	netgear,wax214|\
-	netgear,wax610|\
 	netgear,wax610y|\
+	netgear,wax610|\
+	philips,ly1800|\
 	qihoo,360v6|\
 	redmi,ax5|\
+	sy,y6010|\
 	xiaomi,ax1800|\
 	zn,m2)
 		caldata_extract "0:art" 0x1000 0x10000
