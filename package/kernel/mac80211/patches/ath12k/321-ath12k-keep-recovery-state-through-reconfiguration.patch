@@ -139,7 +139,7 @@ Signed-off-by: JiaY-shi <shi05275@163.com>
  	return ret;
  }
  
-@@ -10627,7 +10649,7 @@ int ath12k_mac_vdev_create(struct ath12k
+@@ -10632,7 +10654,7 @@ int ath12k_mac_vdev_create(struct ath12k
  err_peer_del:
  	if (ahvif->vdev_type == WMI_VDEV_TYPE_AP) {
  		/* ignore return value: propagate the original error */
@@ -148,7 +148,7 @@ Signed-off-by: JiaY-shi <shi05275@163.com>
  	}
  
  err_dp_peer_del:
-@@ -10909,12 +10931,16 @@ static int ath12k_mac_vdev_delete(struct
+@@ -10914,12 +10936,16 @@ static int ath12k_mac_vdev_delete(struct
  	struct ath12k_dp_link_vif *dp_link_vif;
  	struct ath12k_base *ab = ar->ab;
  	unsigned long time_left;
@@ -166,7 +166,7 @@ Signed-off-by: JiaY-shi <shi05275@163.com>
  	ret = ath12k_wmi_vdev_delete(ar, arvif->vdev_id);
  	if (ret) {
  		ath12k_warn(ab, "failed to delete WMI vdev %d: %d\n",
-@@ -10943,7 +10969,8 @@ static int ath12k_mac_vdev_delete(struct
+@@ -10948,7 +10974,8 @@ static int ath12k_mac_vdev_delete(struct
  
  err_vdev_del:
  	spin_lock_bh(&ar->data_lock);
@@ -176,7 +176,7 @@ Signed-off-by: JiaY-shi <shi05275@163.com>
  	spin_unlock_bh(&ar->data_lock);
  
  	ath12k_peer_cleanup(ar, arvif->vdev_id);
-@@ -13553,6 +13580,7 @@ ath12k_mac_op_reconfig_complete(struct i
+@@ -13558,6 +13585,7 @@ ath12k_mac_op_reconfig_complete(struct i
  	struct ath12k_base *ab;
  	struct ath12k_vif *ahvif;
  	struct ath12k_link_vif *arvif;
@@ -184,7 +184,7 @@ Signed-off-by: JiaY-shi <shi05275@163.com>
  	int recovery_count, i;
  
  	lockdep_assert_wiphy(hw->wiphy);
-@@ -13562,19 +13590,31 @@ ath12k_mac_op_reconfig_complete(struct i
+@@ -13567,19 +13595,31 @@ ath12k_mac_op_reconfig_complete(struct i
  
  	guard(mutex)(&ah->hw_mutex);
  
@@ -223,7 +223,7 @@ Signed-off-by: JiaY-shi <shi05275@163.com>
  		    ar->alpha2[0] != 0 && ar->alpha2[1] != 0) {
  			struct wmi_set_current_country_arg arg = {};
  
-@@ -13594,13 +13634,17 @@ ath12k_mac_op_reconfig_complete(struct i
+@@ -13599,13 +13639,17 @@ ath12k_mac_op_reconfig_complete(struct i
  			 */
  			if (recovery_count == ab->num_radios) {
  				atomic_dec(&ab->reset_count);
