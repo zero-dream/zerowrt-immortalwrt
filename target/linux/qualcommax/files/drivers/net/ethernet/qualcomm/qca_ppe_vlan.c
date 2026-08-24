@@ -285,18 +285,21 @@ int qca_ppe_port_vlan_add(struct dsa_switch *ds, int port,
 			return -ENOSPC;
 	}
 
-	entry->ports |= BIT(port);
-
 	if (entry->xlt_idx < 0) {
 		idx = ppe_xlt_idx_alloc(priv);
-		if (idx < 0) {
-			entry->ports &= ~BIT(port);
-			if (!entry->ports)
-				ppe_vlan_free(priv, entry);
-			return -ENOSPC;
-		}
+		if (idx < 0)
+			goto err_free_entry;
 		entry->xlt_idx = idx;
 	}
+
+	if (pvid && entry->xlt_pvid_idx < 0) {
+		idx = ppe_xlt_idx_alloc(priv);
+		if (idx < 0)
+			goto err_free_entry;
+		entry->xlt_pvid_idx = idx;
+	}
+
+	entry->ports |= BIT(port);
 
 	ppe_xlt_rule_set(priv, entry->xlt_idx,
 			 entry->ports | BIT(QCA_PPE_CPU_PORT), vid, false);
@@ -306,15 +309,19 @@ int qca_ppe_port_vlan_add(struct dsa_switch *ds, int port,
 				untagged ? PPE_EG_UNTAGGED : PPE_EG_TAGGED);
 
 	if (pvid) {
-		/* Before the port joins pvid_ports: the update path takes a
-		 * non-empty set as proof that the rule index is live, and a
-		 * refusal here would leave it naming index -1.
+		/* The bridge notifies only the vid coming in, so the entry that
+		 * held this port's untagged rule gives it up here or keeps a
+		 * member it no longer has.
 		 */
-		if (entry->xlt_pvid_idx < 0) {
-			idx = ppe_xlt_idx_alloc(priv);
-			if (idx < 0)
-				return -ENOSPC;
-			entry->xlt_pvid_idx = idx;
+		if (priv->port_pvid[port] != vid) {
+			struct qca_ppe_vlan_entry *old;
+
+			old = ppe_vlan_find(priv, br_dev,
+					    priv->port_pvid[port]);
+			if (old) {
+				old->pvid_ports &= ~BIT(port);
+				ppe_vlan_pvid_update(priv, old);
+			}
 		}
 
 		ppe_port_def_cvid_set(priv, port, vid, true);
@@ -335,6 +342,11 @@ int qca_ppe_port_vlan_add(struct dsa_switch *ds, int port,
 	ppe_vlan_members_update(priv, entry);
 
 	return 0;
+
+err_free_entry:
+	if (!entry->ports)
+		ppe_vlan_free(priv, entry);
+	return -ENOSPC;
 }
 
 int qca_ppe_port_vlan_del(struct dsa_switch *ds, int port,

@@ -13,6 +13,7 @@
 #include <linux/bitfield.h>
 #include <linux/bitops.h>
 #include <linux/etherdevice.h>
+#include <linux/ethtool.h>
 #include <linux/module.h>
 #include <net/flow_offload.h>
 #include <net/ipv6.h>
@@ -241,6 +242,9 @@ static void ppe_acl_slice_write(struct qca_ppe_priv *priv, u32 index,
 #define PPE_ACL_MATCH_KEYS					\
 	(BIT_ULL(FLOW_DISSECTOR_KEY_CONTROL) |			\
 	 BIT_ULL(FLOW_DISSECTOR_KEY_BASIC) |			\
+	 BIT_ULL(FLOW_DISSECTOR_KEY_VLAN) |			\
+	 BIT_ULL(FLOW_DISSECTOR_KEY_CVLAN) |			\
+	 BIT_ULL(FLOW_DISSECTOR_KEY_PPPOE) |			\
 	 BIT_ULL(FLOW_DISSECTOR_KEY_ETH_ADDRS) |		\
 	 BIT_ULL(FLOW_DISSECTOR_KEY_IPV4_ADDRS) |		\
 	 BIT_ULL(FLOW_DISSECTOR_KEY_IPV6_ADDRS) |		\
@@ -261,6 +265,12 @@ static void ppe_acl_slice_write(struct qca_ppe_priv *priv, u32 index,
 struct ppe_acl_rule {
 	struct list_head list;
 	unsigned long cookie;
+	/* The ethtool location this rule was inserted at, or -1 for one that
+	 * came from tc. ethtool has to hand the whole spec back on a get, so
+	 * the rules it owns keep theirs.
+	 */
+	int loc;
+	struct ethtool_rx_flow_spec *fs;
 	int port;
 	int meter;
 	bool mirror;
@@ -325,8 +335,17 @@ static void ppe_acl_key_ip6(struct ppe_acl_slice *slice, int *n, u8 type,
 	ppe_acl_ip6_words(mw, mask->s6_addr32);
 
 	for (i = 0; i < 3; i++) {
-		struct ppe_acl_slice *s = ppe_acl_slice_get(slice, n, type + i);
+		struct ppe_acl_slice *s;
 
+		/* A prefix shorter than the address leaves whole entries with
+		 * nothing to compare, and an entry that compares nothing still
+		 * costs one of the list's eight. The vendor gates each rule
+		 * type on its own half of the mask; so does this.
+		 */
+		if (!mw[i][0] && !mw[i][1])
+			continue;
+
+		s = ppe_acl_slice_get(slice, n, type + i);
 		s->key[0] |= kw[i][0];
 		s->key[1] |= kw[i][1];
 		s->mask[0] |= mw[i][0];
@@ -343,6 +362,7 @@ static int ppe_acl_parse_key(struct flow_rule *rule,
 {
 	struct ppe_acl_slice *s;
 	u8 sip_type, dip_type;
+	u16 addr_type = 0;
 	__be16 proto = 0;
 	int n = 0;
 
@@ -355,6 +375,7 @@ static int ppe_acl_parse_key(struct flow_rule *rule,
 		struct flow_match_control match;
 
 		flow_rule_match_control(rule, &match);
+		addr_type = match.key->addr_type;
 		if (!flow_rule_is_supp_control_flags(FLOW_DIS_IS_FRAGMENT,
 						     match.mask->flags, extack))
 			return -EOPNOTSUPP;
@@ -380,16 +401,25 @@ static int ppe_acl_parse_key(struct flow_rule *rule,
 				NL_SET_ERR_MSG_MOD(extack, "the protocol is matched whole or not at all");
 				return -EOPNOTSUPP;
 			}
-			proto = match.key->n_proto;
-			if (proto != htons(ETH_P_IP) &&
-			    proto != htons(ETH_P_IPV6)) {
-				NL_SET_ERR_MSG_MOD(extack, "only IPv4 and IPv6 are matched by protocol");
-				return -EOPNOTSUPP;
+			/* One bit tells the two IP versions apart, and the
+			 * rule type that carries an ethertype names anything
+			 * else.
+			 */
+			if (match.key->n_proto == htons(ETH_P_IP) ||
+			    match.key->n_proto == htons(ETH_P_IPV6)) {
+				proto = match.key->n_proto;
+				s = ppe_acl_slice_get(slice, &n,
+						      PPE_ACL_TYPE_IPMISC);
+				if (proto == htons(ETH_P_IPV6))
+					s->key[1] |= PPE_ACL_IS_IPV6;
+				s->mask[1] |= PPE_ACL_IS_IPV6;
+			} else {
+				s = ppe_acl_slice_get(slice, &n,
+						      PPE_ACL_TYPE_L2MISC);
+				s->key[0] |= FIELD_PREP(PPE_ACL_L2_PROT,
+						ntohs(match.key->n_proto));
+				s->mask[0] |= PPE_ACL_L2_PROT;
 			}
-			s = ppe_acl_slice_get(slice, &n, PPE_ACL_TYPE_IPMISC);
-			if (proto == htons(ETH_P_IPV6))
-				s->key[1] |= PPE_ACL_IS_IPV6;
-			s->mask[1] |= PPE_ACL_IS_IPV6;
 		}
 		if (match.mask->ip_proto) {
 			s = ppe_acl_slice_get(slice, &n, PPE_ACL_TYPE_IPMISC);
@@ -397,6 +427,64 @@ static int ppe_acl_parse_key(struct flow_rule *rule,
 						match.key->ip_proto);
 			s->mask[0] |= FIELD_PREP(PPE_ACL_L3_PROT,
 						 match.mask->ip_proto);
+		}
+	}
+
+	/* A lone 802.1Q tag classifies into the C slot, which is where the
+	 * bridge's own translation rules key it, and these ports carry no
+	 * service tag: a second tag or an 802.1ad one is never classified, so
+	 * a filter naming either has nothing to match. The format field holds
+	 * one frame format rather than a bitmap of accepted ones.
+	 */
+	if (flow_rule_match_key(rule, FLOW_DISSECTOR_KEY_VLAN)) {
+		struct flow_match_vlan match;
+
+		if (flow_rule_match_key(rule, FLOW_DISSECTOR_KEY_CVLAN)) {
+			NL_SET_ERR_MSG_MOD(extack, "the ports classify one tag, not two");
+			return -EOPNOTSUPP;
+		}
+
+		flow_rule_match_vlan(rule, &match);
+		if (match.key->vlan_tpid != htons(ETH_P_8021Q)) {
+			NL_SET_ERR_MSG_MOD(extack, "only an 802.1Q tag is classified");
+			return -EOPNOTSUPP;
+		}
+
+		s = ppe_acl_slice_get(slice, &n, PPE_ACL_TYPE_VLAN);
+		if (match.mask->vlan_id) {
+			s->key[0] |= FIELD_PREP(PPE_ACL_CVID,
+						match.key->vlan_id);
+			s->mask[0] |= FIELD_PREP(PPE_ACL_CVID,
+						 match.mask->vlan_id);
+		}
+		if (match.mask->vlan_priority) {
+			s->key[0] |= FIELD_PREP(PPE_ACL_CPCP,
+						match.key->vlan_priority);
+			s->mask[0] |= FIELD_PREP(PPE_ACL_CPCP,
+						 match.mask->vlan_priority);
+		}
+		s->key[1] |= FIELD_PREP(PPE_ACL_CTAG_FMT, PPE_ACL_TAG_TAGGED) |
+			     FIELD_PREP(PPE_ACL_STAG_FMT, PPE_ACL_TAG_UNTAGGED);
+		s->mask[1] |= PPE_ACL_CTAG_FMT | PPE_ACL_STAG_FMT;
+	}
+
+	/* tc rewrites the frame's protocol to the one the session carries, so
+	 * the session ethertype comes from the PPPoE key itself.
+	 */
+	if (flow_rule_match_key(rule, FLOW_DISSECTOR_KEY_PPPOE)) {
+		struct flow_match_pppoe match;
+
+		flow_rule_match_pppoe(rule, &match);
+		s = ppe_acl_slice_get(slice, &n, PPE_ACL_TYPE_L2MISC);
+		s->key[0] |= FIELD_PREP(PPE_ACL_L2_PROT,
+					ntohs(match.key->type));
+		s->mask[0] |= FIELD_PREP(PPE_ACL_L2_PROT,
+					 ntohs(match.mask->type));
+		if (match.mask->session_id) {
+			s->key[1] |= FIELD_PREP(PPE_ACL_PPPOE_SID,
+						ntohs(match.key->session_id));
+			s->mask[1] |= FIELD_PREP(PPE_ACL_PPPOE_SID,
+						 ntohs(match.mask->session_id));
 		}
 	}
 
@@ -468,7 +556,13 @@ static int ppe_acl_parse_key(struct flow_rule *rule,
 		dip_type = PPE_ACL_TYPE_IPV4_DIP;
 	}
 
-	if (flow_rule_match_key(rule, FLOW_DISSECTOR_KEY_IPV4_ADDRS)) {
+	/* Which of the two address keys carries the filter's addresses is the
+	 * control key's to say. A dissector that offers both answers for the
+	 * one it does not hold out of the memory the other occupies, and the
+	 * entries that come back match no frame of either family.
+	 */
+	if (addr_type == FLOW_DISSECTOR_KEY_IPV4_ADDRS &&
+	    flow_rule_match_key(rule, FLOW_DISSECTOR_KEY_IPV4_ADDRS)) {
 		struct flow_match_ipv4_addrs match;
 
 		flow_rule_match_ipv4_addrs(rule, &match);
@@ -496,7 +590,8 @@ static int ppe_acl_parse_key(struct flow_rule *rule,
 		}
 	}
 
-	if (flow_rule_match_key(rule, FLOW_DISSECTOR_KEY_IPV6_ADDRS)) {
+	if (addr_type == FLOW_DISSECTOR_KEY_IPV6_ADDRS &&
+	    flow_rule_match_key(rule, FLOW_DISSECTOR_KEY_IPV6_ADDRS)) {
 		struct flow_match_ipv6_addrs match;
 
 		flow_rule_match_ipv6_addrs(rule, &match);
@@ -668,6 +763,7 @@ static void ppe_acl_rule_free(struct qca_ppe_priv *priv,
 		ppe_acl_meter_set(priv, r->meter, 0, 0);
 		clear_bit(r->meter, priv->acl_meter_used);
 	}
+	kfree(r->fs);
 	kfree(r);
 }
 
@@ -740,6 +836,36 @@ static int ppe_acl_parse_action(struct qca_ppe_priv *priv,
 			}
 			act[3] |= PPE_ACL_QID_EN |
 				  FIELD_PREP(PPE_ACL_QID, a->queue.index);
+			break;
+		case FLOW_ACTION_VLAN_POP:
+			/* The format bit beside the change enable is the whole
+			 * choice: the frame leaves without the tag.
+			 */
+			ppe_entry_set(act, PPE_ACL_ACT_CVID_EN_OFF,
+				      PPE_ACL_ACT_EN_LEN, 1);
+			break;
+		case FLOW_ACTION_VLAN_PUSH:
+		case FLOW_ACTION_VLAN_MANGLE:
+			/* A push and a replace are the same write: whether a
+			 * tag was already there is the frame's business, not
+			 * the rule's. tc carries a priority with either,
+			 * named by the filter or defaulted, so both fields of
+			 * the tag are rewritten together.
+			 */
+			if (a->vlan.proto != htons(ETH_P_8021Q)) {
+				NL_SET_ERR_MSG_MOD(extack, "only an 802.1Q tag is edited");
+				return -EOPNOTSUPP;
+			}
+			ppe_entry_set(act, PPE_ACL_ACT_CVID_EN_OFF,
+				      PPE_ACL_ACT_EN_LEN, 1);
+			ppe_entry_set(act, PPE_ACL_ACT_CTAG_FMT_OFF,
+				      PPE_ACL_ACT_EN_LEN, PPE_ACL_ACT_TAG_KEEP);
+			ppe_entry_set(act, PPE_ACL_ACT_CVID_OFF,
+				      PPE_ACL_ACT_VID_LEN, a->vlan.vid);
+			ppe_entry_set(act, PPE_ACL_ACT_CPCP_EN_OFF,
+				      PPE_ACL_ACT_EN_LEN, 1);
+			ppe_entry_set(act, PPE_ACL_ACT_CPCP_OFF,
+				      PPE_ACL_ACT_PCP_LEN, a->vlan.prio);
 			break;
 		case FLOW_ACTION_MANGLE: {
 			enum flow_action_mangle_base htype = a->mangle.htype;
@@ -869,26 +995,21 @@ static struct ppe_acl_rule *ppe_acl_rule_find(struct qca_ppe_priv *priv,
 	return NULL;
 }
 
-int qca_ppe_cls_flower_add(struct dsa_switch *ds, int port,
-			   struct flow_cls_offload *cls, bool ingress)
+/* Place one parsed rule in the engine. Both uAPIs land here: the preference
+ * is tc's for a filter and the location for an ethtool entry, and in each the
+ * lower number is the stronger rule, which the engine expresses as the higher
+ * priority.
+ */
+static int ppe_acl_rule_add(struct qca_ppe_priv *priv, int port,
+			    struct flow_rule *rule, unsigned long cookie,
+			    int loc, const struct ethtool_rx_flow_spec *fs,
+			    u16 prio, struct netlink_ext_ack *extack)
 {
 	struct ppe_acl_slice slice[PPE_ACL_MAX_SLICES] = {};
-	struct flow_rule *rule = flow_cls_offload_flow_rule(cls);
-	struct netlink_ext_ack *extack = cls->common.extack;
-	struct qca_ppe_priv *priv = ds_to_priv(ds);
 	struct ppe_acl_rule *r;
 	int nslices, ret, i;
 	__be16 family;
 	u16 pri;
-
-	if (!ingress) {
-		NL_SET_ERR_MSG_MOD(extack, "the classifier only sees ingress");
-		return -EOPNOTSUPP;
-	}
-	if (cls->common.chain_index) {
-		NL_SET_ERR_MSG_MOD(extack, "only chain 0 reaches the classifier");
-		return -EOPNOTSUPP;
-	}
 
 	nslices = ppe_acl_parse_key(rule, extack, slice, &family);
 	if (nslices < 0)
@@ -906,6 +1027,14 @@ int qca_ppe_cls_flower_add(struct dsa_switch *ds, int port,
 	if (!r)
 		return -ENOMEM;
 	r->meter = -1;
+	r->loc = loc;
+	if (fs) {
+		r->fs = kmemdup(fs, sizeof(*fs), GFP_KERNEL);
+		if (!r->fs) {
+			kfree(r);
+			return -ENOMEM;
+		}
+	}
 
 	/* The meter index comes out of the same lock the entries do: the
 	 * small-packet parameters reach the table without rtnl, and so does a
@@ -922,15 +1051,13 @@ int qca_ppe_cls_flower_add(struct dsa_switch *ds, int port,
 		goto err;
 	}
 
-	/* Every entry of one rule carries the rule's priority; the field is
-	 * nine bits where tc's is thirty-two, so the tail saturates.
-	 */
-	pri = min_t(u32, cls->common.prio, FIELD_MAX(PPE_ACL_RULE_PRI));
+	/* Every entry of one rule carries the rule's priority. */
+	pri = FIELD_MAX(PPE_ACL_RULE_PRI) - prio;
 	for (i = 0; i < nslices; i++)
 		ppe_acl_slice_write(priv, r->group.index[i], &slice[i], r->act,
 				    BIT(port), pri);
 
-	r->cookie = cls->cookie;
+	r->cookie = cookie;
 	r->port = port;
 	list_add_tail(&r->list, &priv->acl_rules);
 	mutex_unlock(&priv->acl_lock);
@@ -942,6 +1069,36 @@ err:
 	mutex_unlock(&priv->acl_lock);
 
 	return ret;
+}
+
+int qca_ppe_cls_flower_add(struct dsa_switch *ds, int port,
+			   struct flow_cls_offload *cls, bool ingress)
+{
+	struct flow_rule *rule = flow_cls_offload_flow_rule(cls);
+	struct netlink_ext_ack *extack = cls->common.extack;
+	struct qca_ppe_priv *priv = ds_to_priv(ds);
+
+	if (!ingress) {
+		NL_SET_ERR_MSG_MOD(extack, "the classifier only sees ingress");
+		return -EOPNOTSUPP;
+	}
+	if (cls->common.chain_index) {
+		NL_SET_ERR_MSG_MOD(extack, "only chain 0 reaches the classifier");
+		return -EOPNOTSUPP;
+	}
+	/* The engine matches the highest priority it holds, where tc gives
+	 * precedence to the lowest preference, so the rule's standing is the
+	 * field's span less the preference. Nine bits carry it, and a
+	 * preference past that is refused rather than tied to another rule's:
+	 * the filter tc reports as offloaded has to be the one that wins.
+	 */
+	if (cls->common.prio > FIELD_MAX(PPE_ACL_RULE_PRI)) {
+		NL_SET_ERR_MSG_MOD(extack, "filter preference is above what the classifier can order; use one below 512");
+		return -EOPNOTSUPP;
+	}
+
+	return ppe_acl_rule_add(priv, port, rule, cls->cookie, -1, NULL,
+				cls->common.prio, extack);
 }
 
 int qca_ppe_cls_flower_del(struct dsa_switch *ds, int port,
@@ -980,6 +1137,127 @@ static ushort ppe_small_pkt_prio = 5;
 static struct qca_ppe_priv *ppe_acl_priv;
 
 static struct ppe_acl_group ppe_small_pkt_group[2];
+
+/* ethtool's n-tuple table is the second way into the same engine, and the only
+ * one that reaches the queue action: its ring cookie names a queue of the whole
+ * switch, where tc can ask for a priority class and leave the hash to pick
+ * which of that class's queues the flow lands in.
+ */
+static struct ppe_acl_rule *ppe_acl_rule_at(struct qca_ppe_priv *priv,
+					    int port, u32 loc)
+{
+	struct ppe_acl_rule *r;
+
+	lockdep_assert_held(&priv->acl_lock);
+
+	list_for_each_entry(r, &priv->acl_rules, list)
+		if (r->port == port && r->loc == loc)
+			return r;
+
+	return NULL;
+}
+
+static int ppe_acl_rxnfc_ins(struct qca_ppe_priv *priv, int port,
+			     struct ethtool_rx_flow_spec *fs)
+{
+	struct ethtool_rx_flow_spec_input input = { .fs = fs };
+	struct ethtool_rx_flow_rule *flow;
+	bool taken;
+	int ret;
+
+	/* The location names the rule and orders it, so it shares the span the
+	 * priority field has.
+	 */
+	if (fs->location > FIELD_MAX(PPE_ACL_RULE_PRI))
+		return -EINVAL;
+
+	mutex_lock(&priv->acl_lock);
+	taken = ppe_acl_rule_at(priv, port, fs->location);
+	mutex_unlock(&priv->acl_lock);
+	if (taken)
+		return -EEXIST;
+
+	flow = ethtool_rx_flow_rule_create(&input);
+	if (IS_ERR(flow))
+		return PTR_ERR(flow);
+
+	ret = ppe_acl_rule_add(priv, port, flow->rule, 0, fs->location, fs,
+			       fs->location, NULL);
+	ethtool_rx_flow_rule_destroy(flow);
+
+	return ret;
+}
+
+int qca_ppe_set_rxnfc(struct dsa_switch *ds, int port,
+		      struct ethtool_rxnfc *nfc)
+{
+	struct qca_ppe_priv *priv = ds_to_priv(ds);
+	struct ppe_acl_rule *r;
+
+	if (nfc->cmd == ETHTOOL_SRXCLSRLINS)
+		return ppe_acl_rxnfc_ins(priv, port, &nfc->fs);
+	if (nfc->cmd != ETHTOOL_SRXCLSRLDEL)
+		return -EOPNOTSUPP;
+
+	guard(mutex)(&priv->acl_lock);
+
+	r = ppe_acl_rule_at(priv, port, nfc->fs.location);
+	if (!r)
+		return -ENOENT;
+
+	ppe_acl_free(priv, &r->group);
+	list_del(&r->list);
+	ppe_acl_rule_free(priv, r);
+
+	return 0;
+}
+
+int qca_ppe_get_rxnfc(struct dsa_switch *ds, int port,
+		      struct ethtool_rxnfc *nfc, u32 *rule_locs)
+{
+	struct qca_ppe_priv *priv = ds_to_priv(ds);
+	struct ppe_acl_rule *r;
+	u32 cnt = 0;
+
+	guard(mutex)(&priv->acl_lock);
+
+	switch (nfc->cmd) {
+	case ETHTOOL_GRXRINGS:
+		/* What the action may name: a queue of the whole switch, not a
+		 * receive ring of this port.
+		 */
+		nfc->data = FIELD_MAX(PPE_ACL_QID) + 1;
+		return 0;
+	case ETHTOOL_GRXCLSRLCNT:
+		list_for_each_entry(r, &priv->acl_rules, list)
+			if (r->port == port && r->loc >= 0)
+				cnt++;
+		nfc->rule_cnt = cnt;
+		nfc->data = FIELD_MAX(PPE_ACL_RULE_PRI) + 1;
+		return 0;
+	case ETHTOOL_GRXCLSRULE:
+		r = ppe_acl_rule_at(priv, port, nfc->fs.location);
+		if (!r || !r->fs)
+			return -ENOENT;
+
+		nfc->fs = *r->fs;
+		return 0;
+	case ETHTOOL_GRXCLSRLALL:
+		list_for_each_entry(r, &priv->acl_rules, list) {
+			if (r->port != port || r->loc < 0)
+				continue;
+			if (cnt >= nfc->rule_cnt)
+				return -EMSGSIZE;
+
+			rule_locs[cnt++] = r->loc;
+		}
+		nfc->rule_cnt = cnt;
+		nfc->data = FIELD_MAX(PPE_ACL_RULE_PRI) + 1;
+		return 0;
+	default:
+		return -EOPNOTSUPP;
+	}
+}
 
 static void ppe_acl_small_pkt_apply(struct qca_ppe_priv *priv)
 {
