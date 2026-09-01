@@ -20,7 +20,7 @@ Signed-off-by: Sriram R <quic_srirrama@quicinc.com>
 
 --- a/net/mac80211/cfg.c
 +++ b/net/mac80211/cfg.c
-@@ -1988,6 +1988,8 @@ static void sta_apply_mesh_params(struct
+@@ -2208,6 +2208,8 @@ static void sta_apply_mesh_params(struct
  			/* init at low value */
  			ewma_mesh_tx_rate_avg_add(&sta->mesh->tx_rate_avg, 10);
  
@@ -29,7 +29,7 @@ Signed-off-by: Sriram R <quic_srirrama@quicinc.com>
  			break;
  		case NL80211_PLINK_LISTEN:
  		case NL80211_PLINK_BLOCKED:
-@@ -2002,6 +2004,7 @@ static void sta_apply_mesh_params(struct
+@@ -2222,6 +2224,7 @@ static void sta_apply_mesh_params(struct
  			ieee80211_mps_sta_status_update(sta);
  			changed |= ieee80211_mps_set_sta_local_pm(sta,
  					NL80211_MESH_POWER_UNKNOWN);
@@ -39,7 +39,7 @@ Signed-off-by: Sriram R <quic_srirrama@quicinc.com>
  			/*  nothing  */
 --- a/net/mac80211/mesh_plink.c
 +++ b/net/mac80211/mesh_plink.c
-@@ -385,6 +385,8 @@ static u64 __mesh_plink_deactivate(struc
+@@ -383,6 +383,8 @@ static u64 __mesh_plink_deactivate(struc
  	changed |= ieee80211_mps_set_sta_local_pm(sta,
  			NL80211_MESH_POWER_UNKNOWN);
  
@@ -48,7 +48,7 @@ Signed-off-by: Sriram R <quic_srirrama@quicinc.com>
  	return changed;
  }
  
-@@ -852,6 +854,7 @@ static u64 mesh_plink_establish(struct i
+@@ -854,6 +856,7 @@ static u64 mesh_plink_establish(struct i
  	mpl_dbg(sdata, "Mesh plink with %pM ESTABLISHED\n", sta->sta.addr);
  	ieee80211_mps_sta_status_update(sta);
  	changed |= ieee80211_mps_set_sta_local_pm(sta, mshcfg->power_mode);
@@ -56,7 +56,7 @@ Signed-off-by: Sriram R <quic_srirrama@quicinc.com>
  	return changed;
  }
  
-@@ -870,7 +873,7 @@ static u64 mesh_plink_fsm(struct ieee802
+@@ -872,7 +875,7 @@ static u64 mesh_plink_fsm(struct ieee802
  	struct mesh_config *mshcfg = &sdata->u.mesh.mshcfg;
  	enum ieee80211_self_protected_actioncode action = 0;
  	u64 changed = 0;
@@ -65,7 +65,7 @@ Signed-off-by: Sriram R <quic_srirrama@quicinc.com>
  
  	mpl_dbg(sdata, "peer %pM in state %s got event %s\n", sta->sta.addr,
  		mplstates[sta->mesh->plink_state], mplevents[event]);
-@@ -930,6 +933,7 @@ static u64 mesh_plink_fsm(struct ieee802
+@@ -932,6 +935,7 @@ static u64 mesh_plink_fsm(struct ieee802
  			break;
  		case CNF_ACPT:
  			changed |= mesh_plink_establish(sdata, sta);
@@ -73,7 +73,7 @@ Signed-off-by: Sriram R <quic_srirrama@quicinc.com>
  			break;
  		default:
  			break;
-@@ -945,6 +949,7 @@ static u64 mesh_plink_fsm(struct ieee802
+@@ -947,6 +951,7 @@ static u64 mesh_plink_fsm(struct ieee802
  			break;
  		case OPN_ACPT:
  			changed |= mesh_plink_establish(sdata, sta);
@@ -81,7 +81,7 @@ Signed-off-by: Sriram R <quic_srirrama@quicinc.com>
  			action = WLAN_SP_MESH_PEERING_CONFIRM;
  			break;
  		default:
-@@ -991,6 +996,10 @@ static u64 mesh_plink_fsm(struct ieee802
+@@ -993,6 +998,10 @@ static u64 mesh_plink_fsm(struct ieee802
  		break;
  	}
  	spin_unlock_bh(&sta->mesh->plink_lock);
@@ -94,7 +94,7 @@ Signed-off-by: Sriram R <quic_srirrama@quicinc.com>
  	if (action) {
 --- a/net/mac80211/rx.c
 +++ b/net/mac80211/rx.c
-@@ -4625,10 +4625,15 @@ void ieee80211_check_fast_rx(struct sta_
+@@ -4811,10 +4811,15 @@ void ieee80211_check_fast_rx(struct sta_
  
  		break;
  	case NL80211_IFTYPE_MESH_POINT:
@@ -112,7 +112,7 @@ Signed-off-by: Sriram R <quic_srirrama@quicinc.com>
  		break;
  	default:
  		goto clear;
-@@ -4669,7 +4674,7 @@ void ieee80211_check_fast_rx(struct sta_
+@@ -4855,7 +4860,7 @@ void ieee80211_check_fast_rx(struct sta_
  	__release(check_fast_rx);
  
  	if (assign)
@@ -121,18 +121,21 @@ Signed-off-by: Sriram R <quic_srirrama@quicinc.com>
  
  	offload_flags = get_bss_sdata(sdata)->vif.offload_flags;
  	offload = offload_flags & IEEE80211_OFFLOAD_DECAP_ENABLED;
-@@ -4851,6 +4856,10 @@ static bool ieee80211_invoke_fast_rx(str
+@@ -5035,8 +5040,12 @@ static bool ieee80211_invoke_fast_rx(str
+ 	struct {
+ 		u8 da[ETH_ALEN];
  		u8 sa[ETH_ALEN];
- 	} addrs __aligned(2);
+-	} addrs __aligned(2);
++		} addrs __aligned(2);
  	struct ieee80211_sta_rx_stats *stats;
 +	struct ieee80211s_hdr *mesh_hdr;
 +	struct mesh_path *mppath;
 +	u8 da_offs = fast_rx->da_offs, sa_offs = fast_rx->sa_offs;
 +	struct ieee80211_sub_if_data *sdata = rx->sdata;
+ 	u32 encoded_rate;
  
  	/* for parallel-rx, we need to have DUP_VALIDATED, otherwise we write
- 	 * to a common data structure; drivers can implement that per queue
-@@ -4900,6 +4909,37 @@ static bool ieee80211_invoke_fast_rx(str
+@@ -5087,6 +5096,37 @@ static bool ieee80211_invoke_fast_rx(str
  		snap_offs += IEEE80211_CCMP_HDR_LEN;
  	}
  
@@ -170,7 +173,7 @@ Signed-off-by: Sriram R <quic_srirrama@quicinc.com>
  	if (!ieee80211_vif_is_mesh(&rx->sdata->vif) &&
  	    !(status->rx_flags & IEEE80211_RX_AMSDU)) {
  		if (!pskb_may_pull(skb, snap_offs + sizeof(*payload)))
-@@ -4937,9 +4977,33 @@ static bool ieee80211_invoke_fast_rx(str
+@@ -5129,9 +5169,33 @@ static bool ieee80211_invoke_fast_rx(str
  		return true;
  	}
  

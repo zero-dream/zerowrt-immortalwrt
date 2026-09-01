@@ -48,7 +48,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  /**
   * enum ieee80211_max_queues - maximum number of queues
   *
-@@ -413,11 +416,17 @@ enum ieee80211_bss_change {
+@@ -424,11 +427,17 @@ enum ieee80211_bss_change {
   * to indicate which NSS BSS parameter changed.
   *
   * @BSS_CHANGED_NSS_AP_ISOLATE: AP Isolate feature in NSS mode
@@ -66,7 +66,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  };
  
  /*
-@@ -868,6 +877,11 @@ struct ieee80211_bss_conf {
+@@ -903,6 +912,11 @@ struct ieee80211_bss_conf {
  	bool he_full_ul_mumimo;
  	bool eht_su_beamformer;
  	bool eht_su_beamformee;
@@ -78,7 +78,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  	bool eht_mu_beamformer;
  	bool eht_80mhz_full_bw_ul_mumimo;
  	bool eht_disable_mcs15;
-@@ -1369,6 +1383,8 @@ struct ieee80211_rate_status {
+@@ -1474,6 +1488,8 @@ struct ieee80211_rate_status {
   * @ack_hwtstamp: Hardware timestamp of the received ack in nanoseconds
   *	Only needed for Timing measurement and Fine timing measurement action
   *	frames. Only reported by devices that have timestamping enabled.
@@ -87,7 +87,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
   */
  struct ieee80211_tx_status {
  	struct ieee80211_sta *sta;
-@@ -1379,6 +1395,8 @@ struct ieee80211_tx_status {
+@@ -1484,6 +1500,8 @@ struct ieee80211_tx_status {
  	u8 n_rates;
  
  	struct list_head *free_list;
@@ -96,7 +96,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  };
  
  /**
-@@ -1883,6 +1901,7 @@ struct ieee80211_channel_switch {
+@@ -2005,6 +2023,7 @@ struct ieee80211_channel_switch {
   *	operation on this interface and request a channel context without
   *	the AP definition. Use this e.g. because the device is able to
   *	handle OFDMA (downlink and trigger for uplink) on a per-AP basis.
@@ -104,7 +104,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
   * @IEEE80211_VIF_REMOVE_AP_AFTER_DISASSOC: indicates that the AP sta should
   *	be removed only after setting the vif as unassociated, and not the
   *	opposite. Only relevant for STA vifs.
-@@ -1895,6 +1914,7 @@ enum ieee80211_vif_flags {
+@@ -2017,6 +2036,7 @@ enum ieee80211_vif_flags {
  	IEEE80211_VIF_EML_ACTIVE	        = BIT(4),
  	IEEE80211_VIF_IGNORE_OFDMA_WIDER_BW	= BIT(5),
  	IEEE80211_VIF_REMOVE_AP_AFTER_DISASSOC	= BIT(6),
@@ -112,15 +112,15 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  };
  
  
-@@ -2984,6 +3004,7 @@ enum ieee80211_hw_flags {
- 	IEEE80211_HW_HANDLES_QUIET_CSA,
+@@ -3167,6 +3187,7 @@ enum ieee80211_hw_flags {
  	IEEE80211_HW_STRICT,
+ 	IEEE80211_HW_SUPPORTS_NDP_BLOCKACK,
  	IEEE80211_HW_SUPPORTS_NSS_OFFLOAD,
 +	IEEE80211_HW_SUPPORTS_MESH_NSS_OFFLOAD,
  
  	/* keep last, obviously */
  	NUM_IEEE80211_HW_FLAGS
-@@ -4522,6 +4543,8 @@ struct ieee80211_prep_tx_info {
+@@ -4711,6 +4732,8 @@ struct ieee80211_prep_tx_info {
   *	to use rx decapsulation offload
   * @sta_set_airtime_weight: Called to notify the driver of a change to a
   *	station's airtime fairness weight, so it can be programmed in hardware.
@@ -129,7 +129,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
   * @add_twt_setup: Update hw with TWT agreement parameters received from the peer.
   *	This callback allows the hw to check if requested parameters
   *	are supported and if there is enough room for a new agreement.
-@@ -4940,6 +4963,12 @@ struct ieee80211_ops {
+@@ -5131,6 +5154,12 @@ struct ieee80211_ops {
  	void (*sta_set_airtime_weight)(struct ieee80211_hw *hw,
  				       struct ieee80211_vif *vif,
  				       struct ieee80211_sta *sta, u16 weight);
@@ -142,13 +142,11 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  	void (*add_twt_setup)(struct ieee80211_hw *hw,
  			      struct ieee80211_sta *sta,
  			      struct ieee80211_twt_setup *twt);
-@@ -8009,4 +8038,101 @@ int ieee80211_emulate_switch_vif_chanctx
-  * Return: %true iff the vif is a NAN interface and NAN is started
+@@ -8277,6 +8306,102 @@ int ieee80211_emulate_switch_vif_chanctx
   */
  bool ieee80211_vif_nan_started(struct ieee80211_vif *vif);
-+
+ 
 +/* Defines for Mesh NSS offload */
-+
 +enum ieee80211_mesh_path_offld_cmd {
 +	IEEE80211_MESH_PATH_OFFLD_CMD_ADD_MPATH,
 +	IEEE80211_MESH_PATH_OFFLD_CMD_UPDATE_MPATH,
@@ -163,12 +161,12 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
 +	IEEE80211_MESH_PATH_OFFLD_ACTION_MPATH_DEL	= BIT(1),
 +	IEEE80211_MESH_PATH_OFFLD_ACTION_MPATH_EXP	= BIT(2),
 +	IEEE80211_MESH_PATH_OFFLD_ACTION_MPP_LEARN	= BIT(3),
-+	IEEE80211_MESH_PATH_OFFLD_ACTION_MPP_ADD	= BIT(4),
++	IEEE80211_MESH_PATH_OFFLD_ACTION_MPP_ADD		= BIT(4),
 +	IEEE80211_MESH_PATH_OFFLD_ACTION_MPP_UPDATE	= BIT(5),
 +	IEEE80211_MESH_PATH_OFFLD_ACTION_PATH_NOT_FOUND	= BIT(6),
 +};
 +
-+/* Duplicate defines to make it available to driver */
++/* Duplicate defines to make them available to drivers. */
 +enum ieee80211_mesh_path_flags {
 +	IEEE80211_MESH_PATH_ACTIVE =		BIT(0),
 +	IEEE80211_MESH_PATH_RESOLVING =		BIT(1),
@@ -195,32 +193,33 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
 +};
 +
 +#ifdef CPTCFG_MAC80211_MESH
-+/** ieee80211_mesh_path_offld_change_notify - Notify mesh path change event.
-+ * @vif: Mesh interface on which the event is being reported.
-+ * @path: Mesh path which got changed. Please note not all the entries in the
-+ *	  path will have valid information. Based on the action code, it will be
-+ *	  processed.
-+ * @action: Type of the event.
++/**
++ * ieee80211_mesh_path_offld_change_notify - notify mesh path change event
++ * @vif: mesh interface on which the event is being reported
++ * @path: mesh path that changed
++ * @action: type of the event
 + */
 +int ieee80211_mesh_path_offld_change_notify(struct ieee80211_vif *vif,
 +					    struct ieee80211_mesh_path_offld *path,
 +					    enum ieee80211_mesh_path_offld_action action);
 +
-+/** ieee80211s_update_metric_ppdu - Upate tx PPDU stats for 11s metric computation
-+ *
++/**
++ * ieee80211s_update_metric_ppdu - update TX PPDU stats for 11s metric computation
 + * @hw: the hardware the frame was transmitted by
-+ * @st: tx status information
-+*/
++ * @st: TX status information
++ */
 +void ieee80211s_update_metric_ppdu(struct ieee80211_hw *hw,
 +				   struct ieee80211_tx_status *st);
 +
-+/** mesh_nss_offld_proxy_path_exp_update - update the expiry time from nss
-+ * @vif Mesh interface on which the event is being reported.
-+ * @mac: dest_mac_addr of the mesh proxy path
-+ * @time_diff: This is the time diff since the mesh peer is active
++/**
++ * mesh_nss_offld_proxy_path_exp_update - update expiry time from NSS
++ * @vif: mesh interface on which the event is being reported
++ * @da: destination MAC address of the mesh proxy path
++ * @mesh_da: mesh destination MAC address
++ * @time_diff: time difference since the mesh peer was active
 + */
-+void mesh_nss_offld_proxy_path_exp_update(struct ieee80211_vif *vif, u8* da,
-+					   u8* mesh_da, u32 time_diff);
++void mesh_nss_offld_proxy_path_exp_update(struct ieee80211_vif *vif, u8 *da,
++					  u8 *mesh_da, u32 time_diff);
 +#else
 +static inline int
 +ieee80211_mesh_path_offld_change_notify(struct ieee80211_vif *vif,
@@ -237,16 +236,18 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
 +}
 +
 +static inline void
-+mesh_nss_offld_proxy_path_exp_update(struct ieee80211_vif *vif, u8* da,
-+				      u8* mesh_da, u32 time_diff)
++mesh_nss_offld_proxy_path_exp_update(struct ieee80211_vif *vif, u8 *da,
++				      u8 *mesh_da, u32 time_diff)
 +{
 +}
 +#endif
 +
- #endif /* MAC80211_H */
+ /**
+  * ieee80211_encrypt_tx_skb - Encrypt the transmit skb
+  * @skb: the skb
 --- a/net/mac80211/cfg.c
 +++ b/net/mac80211/cfg.c
-@@ -2797,6 +2797,7 @@ static int ieee80211_update_mesh_config(
+@@ -3184,6 +3184,7 @@ static int ieee80211_update_mesh_config(
  	struct mesh_config *conf;
  	struct ieee80211_sub_if_data *sdata;
  	struct ieee80211_if_mesh *ifmsh;
@@ -254,7 +255,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  
  	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
  	ifmsh = &sdata->u.mesh;
-@@ -2813,8 +2814,11 @@ static int ieee80211_update_mesh_config(
+@@ -3200,8 +3201,11 @@ static int ieee80211_update_mesh_config(
  		conf->dot11MeshMaxPeerLinks = nconf->dot11MeshMaxPeerLinks;
  	if (_chg_mesh_attr(NL80211_MESHCONF_MAX_RETRIES, mask))
  		conf->dot11MeshMaxRetries = nconf->dot11MeshMaxRetries;
@@ -267,7 +268,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  	if (_chg_mesh_attr(NL80211_MESHCONF_ELEMENT_TTL, mask))
  		conf->element_ttl = nconf->element_ttl;
  	if (_chg_mesh_attr(NL80211_MESHCONF_AUTO_OPEN_PLINKS, mask)) {
-@@ -2828,8 +2832,12 @@ static int ieee80211_update_mesh_config(
+@@ -3215,8 +3219,12 @@ static int ieee80211_update_mesh_config(
  	if (_chg_mesh_attr(NL80211_MESHCONF_HWMP_MAX_PREQ_RETRIES, mask))
  		conf->dot11MeshHWMPmaxPREQretries =
  			nconf->dot11MeshHWMPmaxPREQretries;
@@ -281,7 +282,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  	if (_chg_mesh_attr(NL80211_MESHCONF_MIN_DISCOVERY_TIMEOUT, mask))
  		conf->min_discovery_timeout = nconf->min_discovery_timeout;
  	if (_chg_mesh_attr(NL80211_MESHCONF_HWMP_ACTIVE_PATH_TIMEOUT, mask))
-@@ -2864,8 +2872,12 @@ static int ieee80211_update_mesh_config(
+@@ -3251,8 +3259,12 @@ static int ieee80211_update_mesh_config(
  	if (_chg_mesh_attr(NL80211_MESHCONF_HWMP_RANN_INTERVAL, mask))
  		conf->dot11MeshHWMPRannInterval =
  			nconf->dot11MeshHWMPRannInterval;
@@ -295,7 +296,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  	if (_chg_mesh_attr(NL80211_MESHCONF_RSSI_THRESHOLD, mask)) {
  		/* our RSSI threshold implementation is supported only for
  		 * devices that report signal in dBm.
-@@ -2907,6 +2919,7 @@ static int ieee80211_update_mesh_config(
+@@ -3294,6 +3306,7 @@ static int ieee80211_update_mesh_config(
  		conf->dot11MeshConnectedToAuthServer =
  			nconf->dot11MeshConnectedToAuthServer;
  	ieee80211_mbss_info_change_notify(sdata, BSS_CHANGED_BEACON);
@@ -331,9 +332,9 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  		   sdata, fmt, ##__VA_ARGS__)
 --- a/net/mac80211/debugfs.c
 +++ b/net/mac80211/debugfs.c
-@@ -504,6 +504,7 @@ static const char *hw_flag_names[] = {
- 	FLAG(HANDLES_QUIET_CSA),
+@@ -484,6 +484,7 @@ static const char *hw_flag_names[] = {
  	FLAG(STRICT),
+ 	FLAG(SUPPORTS_NDP_BLOCKACK),
  	FLAG(SUPPORTS_NSS_OFFLOAD),
 +	FLAG(SUPPORTS_MESH_NSS_OFFLOAD),
  #undef FLAG
@@ -341,7 +342,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  
 --- a/net/mac80211/driver-ops.c
 +++ b/net/mac80211/driver-ops.c
-@@ -639,3 +639,23 @@ int drv_change_sta_links(struct ieee8021
+@@ -643,3 +643,23 @@ int drv_change_sta_links(struct ieee8021
  
  	return 0;
  }
@@ -367,7 +368,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
 +#endif
 --- a/net/mac80211/driver-ops.h
 +++ b/net/mac80211/driver-ops.h
-@@ -1836,4 +1836,11 @@ static inline int drv_set_eml_op_mode(st
+@@ -1857,4 +1857,11 @@ drv_nan_peer_sched_changed(struct ieee80
  	return ret;
  }
  
@@ -402,7 +403,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  		 struct ieee80211_mesh_fast_tx_key *key);
 --- a/net/mac80211/mesh_hwmp.c
 +++ b/net/mac80211/mesh_hwmp.c
-@@ -373,6 +373,13 @@ static bool is_metric_better(u32 x, u32
+@@ -324,6 +324,13 @@ static bool is_metric_better(u32 x, u32
  	return (x < y) && (x < (y - x / 10));
  }
  
@@ -416,7 +417,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  /**
   * hwmp_route_info_get - Update routing info to originator and transmitter
   *
-@@ -396,9 +403,10 @@ static u32 hwmp_route_info_get(struct ie
+@@ -347,9 +354,10 @@ static u32 hwmp_route_info_get(struct ie
  {
  	struct ieee80211_local *local = sdata->local;
  	struct mesh_path *mpath;
@@ -428,7 +429,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  	u32 orig_sn, orig_metric;
  	unsigned long orig_lifetime, exp_time;
  	u32 last_hop_metric, new_metric;
-@@ -500,7 +508,10 @@ static u32 hwmp_route_info_get(struct ie
+@@ -463,7 +471,10 @@ static u32 hwmp_route_info_get(struct ie
  		}
  
  		if (fresh_info) {
@@ -440,7 +441,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  				mpath->path_change_count++;
  				flush_mpath = true;
  			}
-@@ -522,6 +533,8 @@ static u32 hwmp_route_info_get(struct ie
+@@ -485,6 +496,8 @@ static u32 hwmp_route_info_get(struct ie
  			/* draft says preq_id should be saved to, but there does
  			 * not seem to be any use for it, skipping by now
  			 */
@@ -449,7 +450,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  		} else
  			spin_unlock_bh(&mpath->state_lock);
  	}
-@@ -552,7 +565,14 @@ static u32 hwmp_route_info_get(struct ie
+@@ -515,7 +528,14 @@ static u32 hwmp_route_info_get(struct ie
  		}
  
  		if (fresh_info) {
@@ -465,7 +466,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  				mpath->path_change_count++;
  				flush_mpath = true;
  			}
-@@ -569,6 +589,8 @@ static u32 hwmp_route_info_get(struct ie
+@@ -532,6 +552,8 @@ static u32 hwmp_route_info_get(struct ie
  			/* init it at a low value - 0 start is tricky */
  			ewma_mesh_fail_avg_add(&sta->mesh->fail_avg, 1);
  			mesh_path_tx_pending(mpath);
@@ -474,7 +475,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  		} else
  			spin_unlock_bh(&mpath->state_lock);
  	}
-@@ -707,15 +729,6 @@ static void hwmp_preq_frame_process(stru
+@@ -675,15 +697,6 @@ static void hwmp_preq_frame_process(stru
  	}
  }
  
@@ -490,7 +491,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  static void hwmp_prep_frame_process(struct ieee80211_sub_if_data *sdata,
  				    struct ieee80211_mgmt *mgmt,
  				    const u8 *prep_elem, u32 metric)
-@@ -1359,3 +1372,274 @@ void mesh_path_tx_root_frame(struct ieee
+@@ -1356,3 +1369,274 @@ void mesh_path_tx_root_frame(struct ieee
  		return;
  	}
  }
@@ -1175,7 +1176,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  void mesh_pathtbl_unregister(struct ieee80211_sub_if_data *sdata)
 --- a/net/mac80211/tx.c
 +++ b/net/mac80211/tx.c
-@@ -2634,7 +2634,7 @@ static struct sk_buff *ieee80211_build_h
+@@ -2676,7 +2676,7 @@ static struct sk_buff *ieee80211_build_h
  	bool multicast;
  	u16 info_id = 0;
  	struct ieee80211_chanctx_conf *chanctx_conf = NULL;
@@ -1184,7 +1185,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  	int ret;
  	u8 link_id = u32_get_bits(ctrl_flags, IEEE80211_TX_CTRL_MLO_LINK);
  
-@@ -2646,6 +2646,9 @@ static struct sk_buff *ieee80211_build_h
+@@ -2688,6 +2688,9 @@ static struct sk_buff *ieee80211_build_h
  		info_flags |= IEEE80211_TX_CTL_REQ_TX_STATUS;
  #endif
  
@@ -1194,7 +1195,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  	/* convert Ethernet header to proper 802.11 header (based on
  	 * operation mode) */
  	ethertype = (skb->data[12] << 8) | skb->data[13];
-@@ -2716,6 +2719,13 @@ static struct sk_buff *ieee80211_build_h
+@@ -2758,6 +2761,13 @@ static struct sk_buff *ieee80211_build_h
  		break;
  #ifdef CPTCFG_MAC80211_MESH
  	case NL80211_IFTYPE_MESH_POINT:
@@ -1208,7 +1209,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  		if (!is_multicast_ether_addr(skb->data)) {
  			struct sta_info *next_hop;
  			bool mpp_lookup = true;
-@@ -2978,10 +2988,10 @@ static struct sk_buff *ieee80211_build_h
+@@ -3040,10 +3050,10 @@ static struct sk_buff *ieee80211_build_h
  
  	skb_reset_mac_header(skb);
  
@@ -1223,7 +1224,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  	if (info_id) {
  		info->status_data = info_id;
  		info->status_data_idr = 1;
-@@ -4325,6 +4335,7 @@ void __ieee80211_subif_start_xmit(struct
+@@ -4389,6 +4399,7 @@ void __ieee80211_subif_start_xmit(struct
  	struct sk_buff *next;
  	int len = skb->len;
  	struct ieee80211_key *key = NULL;
@@ -1231,7 +1232,7 @@ Signed-off-by: Gautham Kumar Senthilkumaran <quic_gauthamk@quicinc.com>
  	struct ieee80211_sub_if_data *ap_sdata;
  
  	if (unlikely(!ieee80211_sdata_running(sdata) || skb->len < ETH_HLEN)) {
-@@ -4399,9 +4410,15 @@ void __ieee80211_subif_start_xmit(struct
+@@ -4463,9 +4474,15 @@ void __ieee80211_subif_start_xmit(struct
  			goto out;
  		}
  

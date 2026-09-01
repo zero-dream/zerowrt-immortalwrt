@@ -19,7 +19,7 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
 
 --- a/drivers/net/wireless/ath/ath11k/Kconfig
 +++ b/drivers/net/wireless/ath/ath11k/Kconfig
-@@ -13,6 +13,16 @@ config ATH11K
+@@ -12,6 +12,16 @@ config ATH11K
  
  	  If you choose to build a module, it'll be called ath11k.
  
@@ -38,17 +38,17 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  	depends on m
 --- a/drivers/net/wireless/ath/ath11k/Makefile
 +++ b/drivers/net/wireless/ath/ath11k/Makefile
-@@ -28,6 +28,7 @@ ath11k-$(CPTCFG_ATH11K_THERMAL) += therm
- ath11k-$(CPTCFG_ATH11K_SPECTRAL) += spectral.o
+@@ -29,6 +29,7 @@ ath11k-$(CPTCFG_ATH11K_SPECTRAL) += spec
  ath11k-$(CONFIG_PM) += wow.o
  ath11k-$(CONFIG_DEV_COREDUMP) += coredump.o
+ ath11k-$(CPTCFG_ATH11K_CFR) += cfr.o
 +ath11k-$(CPTCFG_ATH11K_NSS_SUPPORT) += nss.o
  
  obj-$(CPTCFG_ATH11K_AHB) += ath11k_ahb.o
  ath11k_ahb-y += ahb.o
 --- /dev/null
 +++ b/drivers/net/wireless/ath/ath11k/nss.c
-@@ -0,0 +1,2399 @@
+@@ -0,0 +1,2406 @@
 +// SPDX-License-Identifier: BSD-3-Clause-Clear
 +/*
 + * Copyright (c) 2020 The Linux Foundation. All rights reserved.
@@ -1194,6 +1194,8 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
 +	int tid_idx;
 +	struct ath11k *ar = arsta->arvif->ar;
 +	struct ath11k_base *ab = ar->ab;
++	unsigned int start;
++	u64 rx_bytes;
 +
 +	if (!ab->nss.enabled)
 +		return;
@@ -1246,7 +1248,12 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
 +		peer->nss.nss_stats->rx_packets;
 +	sinfo->filled |= BIT_ULL(NL80211_STA_INFO_RX_PACKETS);
 +
-+	sinfo->rx_bytes = stainfo->deflink.rx_stats.bytes +
++	do {
++		start = u64_stats_fetch_begin(&stainfo->deflink.rx_stats.syncp);
++		rx_bytes = u64_stats_read(&stainfo->deflink.rx_stats.bytes);
++	} while (u64_stats_fetch_retry(&stainfo->deflink.rx_stats.syncp,
++				       start));
++	sinfo->rx_bytes = rx_bytes +
 +		peer->nss.nss_stats->rx_bytes;
 +	sinfo->filled |= BIT_ULL(NL80211_STA_INFO_RX_BYTES);
 +
@@ -2806,7 +2813,7 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  static inline void ath11k_pci_select_window(struct ath11k_pci *ab_pci, u32 offset)
  {
  	struct ath11k_base *ab = ab_pci->ab;
-@@ -922,6 +936,7 @@ static const struct ath11k_hif_ops ath11
+@@ -926,6 +940,7 @@ static const struct ath11k_hif_ops ath11
  	.map_service_to_pipe = ath11k_pcic_map_service_to_pipe,
  	.ce_irq_enable = ath11k_pci_hif_ce_irq_enable,
  	.ce_irq_disable = ath11k_pci_hif_ce_irq_disable,
@@ -2848,7 +2855,7 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  			     enum hal_pn_type pn_type)
 --- a/drivers/net/wireless/ath/ath11k/wmi.c
 +++ b/drivers/net/wireless/ath/ath11k/wmi.c
-@@ -1171,6 +1171,44 @@ int ath11k_wmi_send_pdev_set_regdomain(s
+@@ -1183,6 +1183,44 @@ int ath11k_wmi_send_pdev_set_regdomain(s
  	return ret;
  }
  
@@ -2895,7 +2902,7 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  {
 --- a/drivers/net/wireless/ath/ath11k/wmi.h
 +++ b/drivers/net/wireless/ath/ath11k/wmi.h
-@@ -2890,6 +2890,27 @@ struct pdev_set_regdomain_params {
+@@ -2897,6 +2897,27 @@ struct pdev_set_regdomain_params {
  	u32 pdev_id;
  };
  
@@ -2923,7 +2930,7 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  struct rx_reorder_queue_remove_params {
  	u8 *peer_macaddr;
  	u16 vdev_id;
-@@ -3138,6 +3159,16 @@ struct wmi_pdev_set_regdomain_cmd {
+@@ -3145,6 +3166,16 @@ struct wmi_pdev_set_regdomain_cmd {
  	u32 dfs_domain;
  } __packed;
  
@@ -2940,7 +2947,7 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  struct wmi_peer_set_param_cmd {
  	u32 tlv_header;
  	u32 vdev_id;
-@@ -6398,6 +6429,8 @@ int ath11k_wmi_send_peer_create_cmd(stru
+@@ -6473,6 +6504,8 @@ int ath11k_wmi_send_peer_create_cmd(stru
  int ath11k_wmi_vdev_set_param_cmd(struct ath11k *ar, u32 vdev_id,
  				  u32 param_id, u32 param_value);
  
@@ -2998,7 +3005,7 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  int ath11k_dp_pdev_reo_setup(struct ath11k_base *ab);
 --- a/drivers/net/wireless/ath/ath11k/mac.c
 +++ b/drivers/net/wireless/ath/ath11k/mac.c
-@@ -6386,6 +6386,16 @@ static int ath11k_mac_op_start(struct ie
+@@ -6706,6 +6706,16 @@ static int ath11k_mac_op_start(struct ie
  		goto err;
  	}
  
@@ -3017,7 +3024,7 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  	/* TODO: Do we need to enable ANI? */
 --- a/drivers/net/wireless/ath/ath11k/core.h
 +++ b/drivers/net/wireless/ath/ath11k/core.h
-@@ -909,6 +909,8 @@ struct ath11k_soc_dp_tx_err_stats {
+@@ -926,6 +926,8 @@ struct ath11k_soc_dp_tx_err_stats {
  	 * idr unavailable etc.
  	 */
  	atomic_t misc_fail;
@@ -3026,7 +3033,7 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  };
  
  struct ath11k_soc_dp_stats {
-@@ -959,6 +961,7 @@ struct ath11k_base {
+@@ -976,6 +978,7 @@ struct ath11k_base {
  	struct ath11k_htc htc;
  
  	struct ath11k_dp dp;

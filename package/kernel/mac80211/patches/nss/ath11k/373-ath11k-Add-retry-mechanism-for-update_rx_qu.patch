@@ -41,7 +41,7 @@ Signed-off-by: Tamizh Chelvam Raja <quic_tamizhr@quicinc.com>
 
 --- a/drivers/net/wireless/ath/ath11k/core.h
 +++ b/drivers/net/wireless/ath/ath11k/core.h
-@@ -962,6 +962,9 @@ struct ath11k_soc_dp_stats {
+@@ -979,6 +979,9 @@ struct ath11k_soc_dp_stats {
  	u32 rxdma_error[HAL_REO_ENTR_RING_RXDMA_ECODE_MAX];
  	u32 reo_error[HAL_REO_DEST_RING_ERROR_CODE_MAX];
  	u32 hal_reo_error[DP_REO_DST_RING_MAX];
@@ -53,7 +53,7 @@ Signed-off-by: Tamizh Chelvam Raja <quic_tamizhr@quicinc.com>
  };
 --- a/drivers/net/wireless/ath/ath11k/debugfs.c
 +++ b/drivers/net/wireless/ath/ath11k/debugfs.c
-@@ -729,6 +729,18 @@ static ssize_t ath11k_debugfs_dump_soc_d
+@@ -728,6 +728,18 @@ static ssize_t ath11k_debugfs_dump_soc_d
  			 "\nNSS Transmit Failures: %d\n",
  			 atomic_read(&soc_stats->tx_err.nss_tx_fail));
  
@@ -74,7 +74,7 @@ Signed-off-by: Tamizh Chelvam Raja <quic_tamizhr@quicinc.com>
  	if (len > size)
 --- a/drivers/net/wireless/ath/ath11k/dp.c
 +++ b/drivers/net/wireless/ath/ath11k/dp.c
-@@ -1105,8 +1105,10 @@ int ath11k_dp_alloc(struct ath11k_base *
+@@ -1102,8 +1102,10 @@ int ath11k_dp_alloc(struct ath11k_base *
  
  	INIT_LIST_HEAD(&dp->reo_cmd_list);
  	INIT_LIST_HEAD(&dp->reo_cmd_cache_flush_list);
@@ -110,7 +110,7 @@ Signed-off-by: Tamizh Chelvam Raja <quic_tamizhr@quicinc.com>
  struct dp_reo_cmd {
  	struct list_head list;
  	struct dp_rx_tid data;
-@@ -296,6 +305,12 @@ struct ath11k_dp {
+@@ -294,6 +303,12 @@ struct ath11k_dp {
  	 * - reo_cmd_cache_flush_count
  	 */
  	spinlock_t reo_cmd_lock;
@@ -259,37 +259,38 @@ Signed-off-by: Tamizh Chelvam Raja <quic_tamizhr@quicinc.com>
  		goto free_desc;
  	} else if (status != HAL_REO_CMD_SUCCESS) {
  		/* Shouldn't happen! Cleanup in case of other failure? */
-@@ -781,6 +828,29 @@ static void ath11k_dp_rx_tid_del_func(st
+@@ -781,6 +828,30 @@ static void ath11k_dp_rx_tid_del_func(st
  		return;
  	}
  
-+	/* Check if there is any pending rx_queue, if yes then update it */
++	/* Retry pending UPDATE_RX_QUEUE commands after the ring makes progress. */
 +	spin_lock_bh(&dp->reo_cmd_update_queue_lock);
-+	list_for_each_entry_safe(qelem, qtmp, &dp->reo_cmd_update_rx_queue_list,
-+				 list) {
++	list_for_each_entry_safe(qelem, qtmp,
++				 &dp->reo_cmd_update_rx_queue_list, list) {
 +		if (qelem->reo_cmd_update_rx_queue_resend_flag &&
 +		    qelem->data.active) {
 +			update_rx_tid = &qelem->data;
 +
-+			if (ath11k_peer_rx_tid_delete_handler(ab, update_rx_tid, qelem->tid)) {
++			if (ath11k_peer_rx_tid_delete_handler(ab, update_rx_tid,
++							  qelem->tid)) {
 +				update_rx_tid->active = true;
 +				break;
 +			}
++
 +			update_rx_tid->vaddr_unaligned = NULL;
 +			update_rx_tid->paddr = 0;
 +			update_rx_tid->size = 0;
 +			update_rx_tid->pending_desc_size = 0;
-+
 +			list_del(&qelem->list);
 +			kfree(qelem);
 +		}
 +	}
 +	spin_unlock_bh(&dp->reo_cmd_update_queue_lock);
 +
- 	elem = kzalloc(sizeof(*elem), GFP_ATOMIC);
+ 	elem = kzalloc_obj(*elem, GFP_ATOMIC);
  	if (!elem)
  		goto free_desc;
-@@ -798,13 +868,20 @@ static void ath11k_dp_rx_tid_del_func(st
+@@ -798,13 +869,20 @@ static void ath11k_dp_rx_tid_del_func(st
  		if (dp->reo_cmd_cache_flush_count > DP_REO_DESC_FREE_THRESHOLD ||
  		    time_after(jiffies, elem->ts +
  			       msecs_to_jiffies(DP_REO_DESC_FREE_TIMEOUT_MS))) {
@@ -314,7 +315,7 @@ Signed-off-by: Tamizh Chelvam Raja <quic_tamizhr@quicinc.com>
  		}
  	}
  	spin_unlock_bh(&dp->reo_cmd_lock);
-@@ -820,36 +897,50 @@ free_desc:
+@@ -820,36 +898,50 @@ free_desc:
  void ath11k_peer_rx_tid_delete(struct ath11k *ar,
  			       struct ath11k_peer *peer, u8 tid)
  {

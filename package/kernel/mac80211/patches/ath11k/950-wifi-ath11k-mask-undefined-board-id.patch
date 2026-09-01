@@ -20,7 +20,7 @@ Signed-off-by: Zheng Zhang <everything411@qq.com>
 
 --- a/drivers/net/wireless/ath/ath11k/qmi.c
 +++ b/drivers/net/wireless/ath/ath11k/qmi.c
-@@ -2267,6 +2267,12 @@ static int ath11k_qmi_request_target_cap
+@@ -2266,6 +2266,12 @@ static int ath11k_qmi_request_target_cap
  	else
  		ab->qmi.target.board_id = 0xFF;
  

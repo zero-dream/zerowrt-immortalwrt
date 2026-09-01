@@ -36,7 +36,7 @@ existing empty-ring handling.
 Signed-off-by: Julius Bairaktaris <julius@bairaktaris.de>
 --- a/drivers/net/wireless/ath/ath11k/ce.c
 +++ b/drivers/net/wireless/ath/ath11k/ce.c
-@@ -473,6 +473,17 @@ static struct sk_buff *ath11k_ce_complet
+@@ -472,6 +472,17 @@ static struct sk_buff *ath11k_ce_complet
  
  	spin_lock_bh(&srng->lock);
  
@@ -54,7 +54,7 @@ Signed-off-by: Julius Bairaktaris <julius@bairaktaris.de>
  	ath11k_hal_srng_access_begin(ab, srng);
  
  	desc = ath11k_hal_srng_src_reap_next(ab, srng);
-@@ -751,6 +762,19 @@ int ath11k_ce_send(struct ath11k_base *a
+@@ -750,6 +761,19 @@ int ath11k_ce_send(struct ath11k_base *a
  
  	srng = &ab->hal.srng_list[pipe->src_ring->hal_ring_id];
  

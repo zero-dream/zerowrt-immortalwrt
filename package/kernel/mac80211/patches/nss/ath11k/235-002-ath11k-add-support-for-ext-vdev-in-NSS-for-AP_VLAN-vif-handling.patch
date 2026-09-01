@@ -596,7 +596,7 @@ Signed-off-by: Sathishkumar Muruganandam <murugana@codeaurora.org>
  /*----------------------------Peer Setup/Config -----------------------------*/
  
  int ath11k_nss_set_peer_sec_type(struct ath11k *ar,
-@@ -1379,22 +1820,22 @@ free:
+@@ -1379,24 +1820,24 @@ free:
  	return status;
  }
  
@@ -612,6 +612,8 @@ Signed-off-by: Sathishkumar Muruganandam <murugana@codeaurora.org>
 -	struct ath11k *ar = arsta->arvif->ar;
 +	struct ath11k *ar = arvif->ar;
  	struct ath11k_base *ab = ar->ab;
+ 	unsigned int start;
+ 	u64 rx_bytes;
  
 -	if (!ab->nss.enabled)
 +	if (!ab->nss.stats_enabled)

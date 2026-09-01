@@ -15,15 +15,16 @@ Signed-off-by: Sean Khan <datapronix@protonmail.com>
 
 --- a/net/wireless/nl80211.c
 +++ b/net/wireless/nl80211.c
-@@ -5147,13 +5147,10 @@ static int nl80211_new_key(struct sk_buf
+@@ -5626,13 +5626,10 @@ static int nl80211_new_key(struct sk_buf
  		err = nl80211_validate_key_link_id(info, wdev, link_id,
  				key.type == NL80211_KEYTYPE_PAIRWISE);
  
 -	if (!err) {
--		err = rdev_add_key(rdev, dev, link_id, key.idx,
+-		err = rdev_add_key(rdev, wdev, link_id, key.idx,
+-				   key.type == NL80211_KEYTYPE_PAIRWISE,
 +	if (!err)
-+		return rdev_add_key(rdev, dev, link_id, key.idx,
- 				   key.type == NL80211_KEYTYPE_PAIRWISE,
++		return rdev_add_key(rdev, wdev, link_id, key.idx,
++				    key.type == NL80211_KEYTYPE_PAIRWISE,
  				    mac_addr, &key.p);
 -		if (err)
 -			GENL_SET_ERR_MSG(info, "key addition failed");

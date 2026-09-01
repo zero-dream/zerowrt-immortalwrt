@@ -46,7 +46,7 @@ Signed-off-by: Rameshkumar Sundaram <ramess@codeaurora.org>
 
 --- a/drivers/net/wireless/ath/ath11k/ahb.c
 +++ b/drivers/net/wireless/ath/ath11k/ahb.c
-@@ -1321,6 +1321,7 @@ static void ath11k_ahb_remove_prepare(st
+@@ -1318,6 +1318,7 @@ static void ath11k_ahb_remove_prepare(st
  	set_bit(ATH11K_FLAG_UNREGISTERING, &ab->dev_flags);
  	cancel_work_sync(&ab->restart_work);
  	cancel_work_sync(&ab->qmi.event_work);
@@ -56,7 +56,7 @@ Signed-off-by: Rameshkumar Sundaram <ramess@codeaurora.org>
  static void ath11k_ahb_free_resources(struct ath11k_base *ab)
 --- a/drivers/net/wireless/ath/ath11k/core.c
 +++ b/drivers/net/wireless/ath/ath11k/core.c
-@@ -2876,6 +2876,7 @@ struct ath11k_base *ath11k_core_alloc(st
+@@ -2907,6 +2907,7 @@ struct ath11k_base *ath11k_core_alloc(st
  
  	mutex_init(&ab->core_lock);
  	mutex_init(&ab->tbl_mtx_lock);
@@ -64,7 +64,7 @@ Signed-off-by: Rameshkumar Sundaram <ramess@codeaurora.org>
  	spin_lock_init(&ab->base_lock);
  	mutex_init(&ab->vdev_id_11d_lock);
  	init_completion(&ab->reset_complete);
-@@ -2890,6 +2891,8 @@ struct ath11k_base *ath11k_core_alloc(st
+@@ -2921,6 +2922,8 @@ struct ath11k_base *ath11k_core_alloc(st
  	INIT_WORK(&ab->update_11d_work, ath11k_update_11d);
  	INIT_WORK(&ab->reset_work, ath11k_core_reset);
  	INIT_WORK(&ab->dump_work, ath11k_coredump_upload);
@@ -75,15 +75,15 @@ Signed-off-by: Rameshkumar Sundaram <ramess@codeaurora.org>
  	init_completion(&ab->wow.wakeup_completed);
 --- a/drivers/net/wireless/ath/ath11k/core.h
 +++ b/drivers/net/wireless/ath/ath11k/core.h
-@@ -36,6 +36,7 @@
- #include "rx_desc.h"
+@@ -37,6 +37,7 @@
  #include "coredump.h"
+ #include "cfr.h"
  #include "nss.h"
 +#include "peer.h"
  #include "fw.h"
  
  #define SM(_v, _f) (((_v) << _f##_LSB) & _f##_MASK)
-@@ -1167,6 +1168,9 @@ struct ath11k_base {
+@@ -1184,6 +1185,9 @@ struct ath11k_base {
  
  	u32 max_ast_index;
  	u32 num_ast_entries;
@@ -183,7 +183,7 @@ Signed-off-by: Rameshkumar Sundaram <ramess@codeaurora.org>
  }
 --- a/drivers/net/wireless/ath/ath11k/pci.c
 +++ b/drivers/net/wireless/ath/ath11k/pci.c
-@@ -1211,6 +1211,7 @@ static void ath11k_pci_remove(struct pci
+@@ -1215,6 +1215,7 @@ static void ath11k_pci_remove(struct pci
  	}
  
  	set_bit(ATH11K_FLAG_UNREGISTERING, &ab->dev_flags);
@@ -513,7 +513,7 @@ Signed-off-by: Rameshkumar Sundaram <ramess@codeaurora.org>
  };
  
  struct ath11k_peer {
-@@ -97,6 +95,7 @@ struct ath11k_peer {
+@@ -96,6 +94,7 @@ struct ath11k_peer {
  	bool dp_setup_done;
  	struct ppdu_user_delayba ppdu_stats_delayba;
  	bool delayba_flag;

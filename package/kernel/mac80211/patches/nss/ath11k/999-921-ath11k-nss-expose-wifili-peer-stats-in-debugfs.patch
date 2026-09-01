@@ -21,7 +21,7 @@ already controls.
 Signed-off-by: Julius Bairaktaris <julius@bairaktaris.de>
 --- a/drivers/net/wireless/ath/ath11k/debugfs_sta.c
 +++ b/drivers/net/wireless/ath/ath11k/debugfs_sta.c
-@@ -1104,11 +1104,84 @@ static const struct file_operations fops
+@@ -1237,11 +1237,84 @@ static const struct file_operations fops
  	.llseek = default_llseek,
  };
  

@@ -54,7 +54,7 @@ Signed-off-by: P Praneesh <ppranees@codeaurora.org>
  		tx_ring->tx_status_head =
 --- a/drivers/net/wireless/ath/ath11k/hal.c
 +++ b/drivers/net/wireless/ath/ath11k/hal.c
-@@ -670,7 +670,8 @@ u32 *ath11k_hal_srng_dst_get_next_entry(
+@@ -669,7 +669,8 @@ u32 *ath11k_hal_srng_dst_get_next_entry(
  
  	desc = srng->ring_base_vaddr + srng->u.dst_ring.tp;
  
@@ -64,7 +64,7 @@ Signed-off-by: P Praneesh <ppranees@codeaurora.org>
  
  	/* wrap around to start of ring*/
  	if (srng->u.dst_ring.tp == srng->ring_size)
-@@ -683,8 +684,63 @@ u32 *ath11k_hal_srng_dst_get_next_entry(
+@@ -682,8 +683,63 @@ u32 *ath11k_hal_srng_dst_get_next_entry(
  	return desc;
  }
  

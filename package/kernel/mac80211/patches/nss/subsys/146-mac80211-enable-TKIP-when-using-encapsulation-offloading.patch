@@ -1,8 +1,8 @@
 --- a/net/mac80211/tx.c
 +++ b/net/mac80211/tx.c
-@@ -4745,8 +4745,7 @@ netdev_tx_t ieee80211_subif_start_xmit_8
- 	if (!key)
- 		key = rcu_dereference(sdata->default_unicast_key);
+@@ -4846,8 +4846,7 @@ static void __ieee80211_subif_start_xmit
+ 			key = rcu_dereference(sdata->default_unicast_key);
+ 	}
  
 -	if (key && (!(key->flags & KEY_FLAG_UPLOADED_TO_HARDWARE) ||
 -		    key->conf.cipher == WLAN_CIPHER_SUITE_TKIP))

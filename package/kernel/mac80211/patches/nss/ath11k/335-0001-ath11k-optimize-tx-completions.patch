@@ -13,7 +13,7 @@ Signed-off-by: Venkateswara Naralasetty <quic_vnaralas@quicinc.com>
 
 --- a/drivers/net/wireless/ath/ath11k/dp_tx.c
 +++ b/drivers/net/wireless/ath/ath11k/dp_tx.c
-@@ -406,6 +406,7 @@ ath11k_dp_tx_htt_tx_complete_buf(struct
+@@ -407,6 +407,7 @@ ath11k_dp_tx_htt_tx_complete_buf(struct
  	struct ath11k_skb_cb *skb_cb;
  	struct ath11k *ar;
  	struct ath11k_peer *peer;
@@ -21,7 +21,7 @@ Signed-off-by: Venkateswara Naralasetty <quic_vnaralas@quicinc.com>
  
  	spin_lock(&tx_ring->tx_idr_lock);
  	msdu = idr_remove(&tx_ring->txbuf_idr, ts->msdu_id);
-@@ -648,9 +649,41 @@ err_out:
+@@ -649,9 +650,41 @@ err_out:
  	spin_unlock_bh(&ab->base_lock);
  }
  
@@ -64,7 +64,7 @@ Signed-off-by: Venkateswara Naralasetty <quic_vnaralas@quicinc.com>
  {
  	struct ieee80211_tx_status status = {};
  	struct ieee80211_rate_status status_rate = {};
-@@ -660,8 +693,11 @@ static void ath11k_dp_tx_complete_msdu(s
+@@ -661,8 +694,11 @@ static void ath11k_dp_tx_complete_msdu(s
  	struct ath11k_peer *peer;
  	struct ath11k_sta *arsta;
  	struct rate_info rate;
@@ -77,7 +77,7 @@ Signed-off-by: Venkateswara Naralasetty <quic_vnaralas@quicinc.com>
  		/* Must not happen */
  		return;
  	}
-@@ -670,12 +706,15 @@ static void ath11k_dp_tx_complete_msdu(s
+@@ -671,12 +707,15 @@ static void ath11k_dp_tx_complete_msdu(s
  
  	dma_unmap_single(ab->dev, skb_cb->paddr, msdu->len, DMA_TO_DEVICE);
  
@@ -94,7 +94,7 @@ Signed-off-by: Venkateswara Naralasetty <quic_vnaralas@quicinc.com>
  		}
  		if (skb_has_frag_list(msdu)) {
  			kfree_skb_list(skb_shinfo(msdu)->frag_list);
-@@ -685,6 +724,8 @@ static void ath11k_dp_tx_complete_msdu(s
+@@ -686,6 +725,8 @@ static void ath11k_dp_tx_complete_msdu(s
  		return;
  	}
  
@@ -103,7 +103,7 @@ Signed-off-by: Venkateswara Naralasetty <quic_vnaralas@quicinc.com>
  	if (unlikely(!rcu_access_pointer(ab->pdevs_active[ar->pdev_idx]))) {
  		ieee80211_free_txskb(ar->hw, msdu);
  		return;
-@@ -701,10 +742,10 @@ static void ath11k_dp_tx_complete_msdu(s
+@@ -702,10 +743,10 @@ static void ath11k_dp_tx_complete_msdu(s
  	/* skip tx rate update from ieee80211_status*/
  	info->status.rates[0].idx = -1;
  
@@ -116,7 +116,7 @@ Signed-off-by: Venkateswara Naralasetty <quic_vnaralas@quicinc.com>
  
  		if (!test_bit(WMI_TLV_SERVICE_HW_DB2DBM_CONVERSION_SUPPORT,
  			      ab->wmi_ab.svc_map))
-@@ -713,40 +754,40 @@ static void ath11k_dp_tx_complete_msdu(s
+@@ -714,40 +755,40 @@ static void ath11k_dp_tx_complete_msdu(s
  		info->status.flags |= IEEE80211_TX_STATUS_ACK_SIGNAL_VALID;
  	}
  
@@ -167,7 +167,7 @@ Signed-off-by: Venkateswara Naralasetty <quic_vnaralas@quicinc.com>
  		spin_unlock_bh(&ab->base_lock);
  		ieee80211_free_txskb(ar->hw, msdu);
  		return;
-@@ -768,37 +809,6 @@ static void ath11k_dp_tx_complete_msdu(s
+@@ -769,37 +810,6 @@ static void ath11k_dp_tx_complete_msdu(s
  	ieee80211_tx_status_ext(ar->hw, &status);
  }
  
@@ -205,7 +205,7 @@ Signed-off-by: Venkateswara Naralasetty <quic_vnaralas@quicinc.com>
  static inline bool ath11k_dp_tx_completion_valid(struct hal_wbm_release_ring *desc)
  {
  	struct htt_tx_wbm_completion *status_desc;
-@@ -822,9 +832,9 @@ void ath11k_dp_tx_completion_handler(str
+@@ -823,9 +833,9 @@ void ath11k_dp_tx_completion_handler(str
  	int hal_ring_id = dp->tx_ring[ring_id].tcl_comp_ring.ring_id, count = 0, i = 0;
  	struct hal_srng *status_ring = &ab->hal.srng_list[hal_ring_id];
  	struct sk_buff *msdu;
@@ -216,7 +216,7 @@ Signed-off-by: Venkateswara Naralasetty <quic_vnaralas@quicinc.com>
  	struct hal_wbm_release_ring *desc;
  	u32 msdu_id, desc_id;
  	u8 mac_id;
-@@ -865,14 +875,16 @@ void ath11k_dp_tx_completion_handler(str
+@@ -866,14 +876,16 @@ void ath11k_dp_tx_completion_handler(str
  
  	while (count--) {
  		tx_status = &tx_ring->tx_status[i++];
@@ -235,7 +235,7 @@ Signed-off-by: Venkateswara Naralasetty <quic_vnaralas@quicinc.com>
  			ath11k_dp_tx_process_htt_tx_complete(ab,
  							     (void *)tx_status,
  							     mac_id, msdu_id,
-@@ -896,7 +908,7 @@ void ath11k_dp_tx_completion_handler(str
+@@ -897,7 +909,7 @@ void ath11k_dp_tx_completion_handler(str
  		if (atomic_dec_and_test(&ar->dp.num_tx_pending))
  			wake_up(&ar->dp.tx_empty_waitq);
  
