@@ -287,9 +287,9 @@ Signed-off-by: Venkateswara Naralasetty <quic_vnaralas@quicinc.com>
  
 -		spin_unlock(&tx_ring->tx_idr_lock);
 -
-		ar = ab->pdevs[mac_id].ar;
-
-		if (atomic_dec_and_test(&ar->dp.num_tx_pending))
+ 		ar = ab->pdevs[mac_id].ar;
+ 
+ 		if (atomic_dec_and_test(&ar->dp.num_tx_pending))
 --- a/drivers/net/wireless/ath/ath11k/mac.c
 +++ b/drivers/net/wireless/ath/ath11k/mac.c
 @@ -7864,6 +7864,7 @@ static void ath11k_mac_op_remove_interfa
@@ -300,7 +300,7 @@ Signed-off-by: Venkateswara Naralasetty <quic_vnaralas@quicinc.com>
  
  	mutex_lock(&ar->conf_mutex);
  
-@@ -7947,8 +7948,9 @@ err_vdev_del:
+@@ -7946,8 +7947,9 @@ err_vdev_del:
  
  	for (i = 0; i < ab->hw_params.hal_params->num_tx_rings; i++) {
  		spin_lock_bh(&ab->dp.tx_ring[i].tx_idr_lock);

@@ -628,7 +628,7 @@ Signed-off-by: Sathishkumar Muruganandam <murugana@codeaurora.org>
  					sta->addr);
  		goto exit;
  	}
-@@ -1466,13 +1907,13 @@ void ath11k_nss_update_sta_rxrate(struct
+@@ -1473,13 +1914,13 @@ void ath11k_nss_update_sta_rxrate(struct
  				  struct ath11k_peer *peer,
  				  struct hal_rx_user_status *user_stats)
  {
@@ -644,7 +644,7 @@ Signed-off-by: Sathishkumar Muruganandam <murugana@codeaurora.org>
  	struct ath11k_base *ab = ar->ab;
  
  	if (!ab->nss.enabled)
-@@ -1776,8 +2217,8 @@ int ath11k_nss_add_wds_peer(struct ath11
+@@ -1783,8 +2224,8 @@ int ath11k_nss_add_wds_peer(struct ath11
  	}
  
  	ath11k_dbg(ab, ATH11K_DBG_NSS_WDS,
@@ -655,7 +655,7 @@ Signed-off-by: Sathishkumar Muruganandam <murugana@codeaurora.org>
  
  msg_free:
  	kfree(wlmsg);
-@@ -1822,8 +2263,8 @@ int ath11k_nss_update_wds_peer(struct at
+@@ -1829,8 +2270,8 @@ int ath11k_nss_update_wds_peer(struct at
  	}
  
  	ath11k_dbg(ab, ATH11K_DBG_NSS_WDS,

@@ -131,9 +131,9 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  
 --- a/net/mac80211/util.c
 +++ b/net/mac80211/util.c
-@@ -955,6 +955,22 @@ u32 ieee80211_chandef_radio_mask(struct
- 	return mask;
+@@ -938,6 +938,22 @@ struct wireless_dev *ieee80211_vif_to_wd
  }
+ EXPORT_SYMBOL_GPL(ieee80211_vif_to_wdev);
  
 +struct wireless_dev *ieee80211_vif_to_wdev_relaxed(struct ieee80211_vif *vif)
 +{

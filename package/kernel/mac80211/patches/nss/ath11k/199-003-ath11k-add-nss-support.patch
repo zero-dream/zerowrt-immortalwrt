@@ -1032,8 +1032,8 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
 -	int tid_idx;
  	struct ath11k *ar = arsta->arvif->ar;
  	struct ath11k_base *ab = ar->ab;
- 
-@@ -1234,6 +1253,9 @@ void ath11k_nss_update_sta_rxrate(struct
+ 	unsigned int start;
+@@ -1241,6 +1260,9 @@ void ath11k_nss_update_sta_rxrate(struct
  	if (!ab->nss.enabled)
  		return;
  
@@ -1043,7 +1043,7 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  	if (!peer->nss.nss_stats)
  		return;
  
-@@ -1293,7 +1315,7 @@ void ath11k_nss_update_sta_rxrate(struct
+@@ -1300,7 +1322,7 @@ void ath11k_nss_update_sta_rxrate(struct
  		peer->nss.nss_stats->rxrate.mcs = mcs;
  		peer->nss.nss_stats->rxrate.flags = RATE_INFO_FLAGS_HE_MCS;
  		peer->nss.nss_stats->rxrate.he_dcm = ppdu_info->dcm;

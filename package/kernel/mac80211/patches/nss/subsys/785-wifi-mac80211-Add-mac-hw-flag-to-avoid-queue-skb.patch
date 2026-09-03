@@ -106,7 +106,7 @@ Signed-off-by: Yuvasree Sivasankaran <quic_ysivasan@quicinc.com>
  
  	if (is_multicast_ether_addr(skb->data) &&
  	    sdata->vif.type == NL80211_IFTYPE_AP_VLAN &&
-@@ -6780,9 +6790,12 @@ int ieee80211_tx_control_port(struct wip
+@@ -6781,9 +6791,12 @@ int ieee80211_tx_control_port(struct wip
  	}
  
  	if (!IS_ERR(sta)) {
@@ -123,7 +123,7 @@ Signed-off-by: Yuvasree Sivasankaran <quic_ysivasan@quicinc.com>
  		 * for MLO STA, the SA should be the AP MLD address, but
 --- a/net/mac80211/cfg.c
 +++ b/net/mac80211/cfg.c
-@@ -5435,6 +5435,9 @@ static int ieee80211_get_txq_stats(struc
+@@ -5414,6 +5414,9 @@ static int ieee80211_get_txq_stats(struc
  	struct ieee80211_sub_if_data *sdata;
  	int ret = 0;
  

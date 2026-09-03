@@ -421,7 +421,7 @@ Signed-off-by: P Praneesh <ppranees@codeaurora.org>
  	if (len > size)
 --- a/drivers/net/wireless/ath/ath11k/hw.h
 +++ b/drivers/net/wireless/ath/ath11k/hw.h
-@@ -227,6 +227,7 @@ struct ath11k_hw_params {
+@@ -220,6 +220,7 @@ struct ath11k_hw_params {
  	bool fix_l1ss;
  	bool credit_flow;
  	const struct ath11k_hw_hal_params *hal_params;
