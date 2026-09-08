@@ -9,6 +9,7 @@
 #include <linux/if_ether.h>
 #include <linux/if_vlan.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/phylink.h>
 #include <linux/phy.h>
 #include <linux/string.h>
@@ -1517,3 +1518,8 @@ void rtl837x_dsa_shutdown(struct rtk_gsw *gsw)
 	dsa_switch_shutdown(&gsw->ds);
 	gsw->dsa_registered = false;
 }
+
+MODULE_DESCRIPTION("RTL837x DSA switch driver");
+#ifdef CONFIG_MODULE_STRIPPED
+MODULE_INFO(description, "RTL837x DSA switch driver");
+#endif
