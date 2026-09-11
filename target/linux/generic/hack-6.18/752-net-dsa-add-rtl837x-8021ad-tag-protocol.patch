@@ -1,18 +1,14 @@
 From: ViKing <viking.yfy@qq.com>
-Date: Tue, 8 Sep 2026 12:00:00 +0800
-Subject: [PATCH] net: dsa: add RTL837x private tag protocol and PPPoE trace
+Subject: [PATCH] net: dsa: add RTL837x 8021ad tag protocol and bounded PPPoE trace
 
-RTL837x switches use an outer service VLAN to carry the tag_8021q
-standalone source-port identity while preserving an inner customer VLAN.
-Keep PPPoE discovery/control diagnostics at the DSA boundary for P8
-troubleshooting. Use independent per-switch limits (8 TX and 8 RX records
-per 30 seconds), exclude ordinary PPP data and combine RX tag/payload
-details. Report source-decode errors once per 30 seconds with a cumulative
-count, without repeated suppression notices. Reject missing transport tags
-before the VLAN decoder can interpret PPPoE or IP payload as a VLAN header.
+Use an outer service VLAN for the tag_8021q source-port identity and retain
+the inner customer VLAN. Share the tagger through a dedicated protocol ID.
+Reject missing transport tags before decoding their payload.
 
-Add a dedicated protocol identifier and share the existing VLAN tagger
-implementation.
+Keep per-switch discovery/control and decode-error diagnostics. Aggregate
+normal LCP echo requests/replies into one interval summary per minute so
+heartbeats cannot consume the independent TX/RX control-event budgets.
+Retain packet counts and session samples without suppression-message spam.
 
 Signed-off-by: ViKing <viking.yfy@qq.com>
 ---
@@ -36,7 +32,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  struct dsa_switch;
 --- a/net/dsa/tag_vsc73xx_8021q.c
 +++ b/net/dsa/tag_vsc73xx_8021q.c
-@@ -1,22 +1,99 @@
+@@ -1,22 +1,131 @@
  // SPDX-License-Identifier: GPL-2.0 OR MIT
  /* Copyright (C) 2024 Pawel Dembicki <paweldembicki@gmail.com>
   */
@@ -58,7 +54,9 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
 +	struct ratelimit_state errors;
 +	struct ratelimit_state tx;
 +	struct ratelimit_state rx;
++	struct ratelimit_state echo;
 +	atomic_t decode_errors;
++	atomic_t echo_packets[2][2];
 +};
 +
 +struct vsc73xx_pppoe_trace {
@@ -93,9 +91,34 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
 +	return trace->protocol >= 0x8000 && !(hdr[6] & 1);
 +}
 +
++static bool vsc73xx_pppoe_log(struct vsc73xx_tagger_data *data,
++			      const struct vsc73xx_pppoe_trace *trace,
++			      struct net_device *dev, bool tx)
++{
++	/* Normal LCP echo must not consume discovery/authentication budgets.
++	 * Keep interval counts and a session sample instead of per-packet logs.
++	 */
++	if (trace->protocol == 0xc021 &&
++	    (trace->code == 9 || trace->code == 10)) {
++		atomic_inc(&data->echo_packets[tx][trace->code - 9]);
++		if (__ratelimit(&data->echo))
++			netdev_info(dev,
++				    "rtl837x-pppoe-echo: sid=%u tx-request=%u tx-reply=%u rx-request=%u rx-reply=%u interval=60s\n",
++				    trace->sid,
++				    (u32)atomic_xchg(&data->echo_packets[1][0], 0),
++				    (u32)atomic_xchg(&data->echo_packets[1][1], 0),
++				    (u32)atomic_xchg(&data->echo_packets[0][0], 0),
++				    (u32)atomic_xchg(&data->echo_packets[0][1], 0));
++		return false;
++	}
++
++	return __ratelimit(tx ? &data->tx : &data->rx);
++}
++
 +static int vsc73xx_connect(struct dsa_switch *ds)
 +{
 +	struct vsc73xx_tagger_data *data;
++	int dir, code;
 +
 +	data = kzalloc(sizeof(*data), GFP_KERNEL);
 +	if (!data)
@@ -107,10 +130,15 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
 +	ratelimit_state_init(&data->errors, 30 * HZ, 1);
 +	ratelimit_state_init(&data->tx, 30 * HZ, 8);
 +	ratelimit_state_init(&data->rx, 30 * HZ, 8);
++	ratelimit_state_init(&data->echo, 60 * HZ, 1);
 +	ratelimit_set_flags(&data->errors, RATELIMIT_MSG_ON_RELEASE);
 +	ratelimit_set_flags(&data->tx, RATELIMIT_MSG_ON_RELEASE);
 +	ratelimit_set_flags(&data->rx, RATELIMIT_MSG_ON_RELEASE);
++	ratelimit_set_flags(&data->echo, RATELIMIT_MSG_ON_RELEASE);
 +	atomic_set(&data->decode_errors, 0);
++	for (dir = 0; dir < 2; dir++)
++		for (code = 0; code < 2; code++)
++			atomic_set(&data->echo_packets[dir][code], 0);
 +	ds->tagger_data = data;
 +	return 0;
 +}
@@ -138,12 +166,13 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  		unsigned int bridge_num = dsa_port_bridge_num_get(dp);
  		struct net_device *br = dsa_port_bridge_dev_get(dp);
  
-@@ -27,42 +104,151 @@
+@@ -27,42 +136,152 @@
  	}
  
  	pcp = netdev_txq_to_tc(netdev, queue_mapping);
 +	if (vsc73xx_pppoe_control(skb, ntohs(skb->protocol), ETH_HLEN,
-+				  &trace) && __ratelimit(&data->tx))
++				  &trace) &&
++	    vsc73xx_pppoe_log(data, &trace, netdev, true))
 +		netdev_info(netdev,
 +			    "rtl837x-pppoe-tx: tree=%d switch=%d port=%d tpid=0x%04x vid=%u pcp=%u proto=0x%04x sid=%u ppp=0x%04x code=%u len=%u offload=%u\n",
 +			    dp->ds->dst->index, dp->ds->index, dp->index, tpid,
@@ -237,7 +266,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
 +	if (!skb->dev)
 +		goto decode_error;
 +
-+	if (control && __ratelimit(&data->rx))
++	if (control && vsc73xx_pppoe_log(data, &trace, skb->dev, false))
 +		netdev_info(netdev,
 +			    "rtl837x-pppoe-rx: raw_tpid=0x%04x raw_tci=0x%04x inner_proto=0x%04x hw_vlan=%u decoded=%d/%d/%d/%d user=%s customer-tci=%d proto=0x%04x sid=%u ppp=0x%04x code=%u source=%pM dest=%pM len=%u\n",
 +			    raw_proto, raw_tci, inner_proto, hw_vlan, src_port,
