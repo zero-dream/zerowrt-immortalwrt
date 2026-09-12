@@ -10,7 +10,7 @@ expose upper counts beside the existing flow diagnostics.
 
 Signed-off-by: ViKing <viking.yfy@qq.com>
 ---
---- /dev/null
+--- a/drivers/net/ethernet/qualcomm/ppe/ppe_flow_account.h
 +++ b/drivers/net/ethernet/qualcomm/ppe/ppe_flow_account.h
 @@ -0,0 +1,104 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
@@ -153,7 +153,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
   * @block_cb_list: Flow block callbacks bound to the PPE ports.
   * @hosts: Refcount of the flows sharing a source host entry.
   */
-@@ -381,6 +387,7 @@
+@@ -382,6 +388,7 @@
  	struct ppe_ft_tunnel_underlay tunnel_underlays[PPE_FT_TUNNEL_UNDERLAYS];
  	struct ppe_ft_tunnel_pppoe_port tunnel_pppoe_ports[PPE_PORT_ID_COUNT];
  	struct notifier_block ppp_nb;
@@ -161,7 +161,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	struct list_head block_cb_list;
  };
  
-@@ -2428,6 +2435,8 @@
+@@ -2442,6 +2449,8 @@
  	ppe_ft_tunnel_put(ft, flow->tunnel);
  	ppe_vp_put(ft->ppe_dev, flow->vp);
  	ppe_vp_put(ft->ppe_dev, flow->ivp);
@@ -170,7 +170,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	if (flow->egress_dev) {
  		dev_put(flow->egress_dev);
  		flow->egress_dev = NULL;
-@@ -2499,6 +2508,12 @@
+@@ -2513,6 +2522,12 @@
  {
  	int ret;
  
@@ -183,7 +183,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	ret = ppe_flow_entry_matches(ft->ppe_dev, flow->index, &flow->entry);
  	if (!ret)
  		ret = ppe_flow_entry_enable(ft->ppe_dev, flow->index, false);
-@@ -2512,6 +2527,8 @@
+@@ -2526,6 +2541,8 @@
  
  static void ppe_ft_flow_release(struct ppe_ft_flow *flow)
  {
@@ -192,7 +192,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	if (flow->egress_dev)
  		dev_put(flow->egress_dev);
  	kfree(flow);
-@@ -3051,6 +3068,9 @@
+@@ -3065,6 +3082,9 @@
  				master ? master->dev_addr : idev->dev_addr);
  		rcu_read_unlock();
  		imtu = idev->mtu;
@@ -202,7 +202,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  
  		if (edma_port_dev_check(idev)) {
  			struct edma_port_priv *ipriv = netdev_priv(idev);
-@@ -3130,6 +3150,8 @@
+@@ -3144,6 +3164,8 @@
  	}
  
  	reject_reason = PPE_FT_REJECT_EGRESS_VP;
@@ -211,7 +211,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	if (!tunnel_encap) {
  		if (edma_port_dev_check(odev)) {
  			port_priv = netdev_priv(odev);
-@@ -3245,6 +3267,8 @@
+@@ -3259,6 +3281,8 @@
  	 * port from the flow entry itself.
  	 */
  	mutex_lock(&ft->lock);
@@ -220,7 +220,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	if (tunnel_flow) {
  		struct in6_addr local, remote;
  		int link, mtu;
-@@ -3540,6 +3564,14 @@
+@@ -3573,6 +3597,14 @@
  		goto err_host;
  	flow->index = ret;
  
@@ -235,7 +235,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	ret = ppe_flow_entry_enable(ft->ppe_dev, flow->index, true);
  	if (ret)
  		goto err_added_flow;
-@@ -3656,6 +3688,10 @@
+@@ -3689,6 +3721,10 @@
  err_free:
  	if (ret)
  		atomic_long_inc(&ft->rejects[reject_reason]);
@@ -246,7 +246,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	if (flow && flow->egress_dev)
  		dev_put(flow->egress_dev);
  	kfree_rcu(flow, rcu);
-@@ -3839,10 +3875,16 @@
+@@ -3872,10 +3908,16 @@
  
  	ret = ppe_flow_stats_get(ft->ppe_dev, flow->index, &packets, &bytes);
  	if (!ret && (packets != flow->packets || bytes != flow->bytes)) {
@@ -265,8 +265,8 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  				  FLOW_ACTION_HW_STATS_DELAYED);
  		flow->packets = packets;
  		flow->bytes = bytes;
-@@ -4439,6 +4481,8 @@
- 			   flow->my_mac, flow->pub_ip, packets,
+@@ -4596,6 +4638,8 @@
+ 			   flow->my_mac, flow->pub_ip, stats_err, packets,
  			   (unsigned long long)bytes);
  		ppe_ft_input_l3_show(seq, ft, flow);
 +		seq_printf(seq, "  account_uppers rx:%u tx:%u\n",
@@ -274,7 +274,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  		ppe_ft_debug_words(seq, "flow_raw", f, flow_words);
  		seq_printf(seq,
  			   "  flow_dec read:%d qos_read:%d valid:%u type:%u host_dst:%u host:%u proto:%lu age:%lu src_l3_valid:%u src_l3:%lu fwd:%lu nexthop:%u nat_l4:%lu profile:%u service:%lu",
-@@ -4808,6 +4852,37 @@
+@@ -4970,6 +5014,37 @@
  	}
  }
  
@@ -312,7 +312,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  /**
   * ppe_flowtable_setup - Set up the flowtable offload state
   * @ppe_dev: PPE device
-@@ -4867,9 +4942,15 @@
+@@ -5029,9 +5104,15 @@
  
  	hash_init(ft->hosts);
  	ft->ppp_nb.notifier_call = ppe_ft_ppp_event;
@@ -329,7 +329,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	if (ret) {
  		ppe_dev->flowtable = NULL;
  		rhashtable_destroy(&ft->flows);
-@@ -4919,6 +5000,7 @@
+@@ -5081,6 +5162,7 @@
  		return;
  
  	WARN_ON(!list_empty(&ft->block_cb_list));
