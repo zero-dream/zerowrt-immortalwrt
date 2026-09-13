@@ -72,18 +72,20 @@ MDIO address, and DSA port layout.
 The IPQ4019 MDIO controller patch also emits one startup line containing the
 requested rate, effective divider, and mode register for hardware validation.
 
-The package installs the kernel's switch-agnostic 802.1Q DSA tagger:
+The package installs the dedicated RTL837x 802.1ad DSA tagger:
 
 ```text
-tag_vsc73xx_8021q.ko
+tag_rtl837x_8021ad.ko
 ```
 
 The driver uses standard VLAN headers so host MAC checksum engines can parse
 the encapsulated Ethernet frame. The proprietary `0x8899` CPU tag is disabled.
-By default, port identity is encoded by the Linux tag_8021q core using
-standalone and bridge VIDs. Boards which enable `realtek,dsa-svlan` instead use
-an outer 802.1ad S-tag for the standalone source-port VID and retain the inner
-802.1Q C-tag for an ordinary user VLAN.
+Port identity always uses an outer 802.1ad S-tag allocated by the Linux
+tag_8021q core. The inner 802.1Q C-tag belongs to the customer VLAN. There is
+one transport mode for all supported boards; the former `realtek,dsa-svlan`
+property is no longer required or read. Untagged user frames remain valid.
+SVID and CVID membership have separate software tables, including when the
+two VLAN IDs have the same numerical value.
 
 The driver implements `port_change_mtu` and `port_max_mtu`. DSA therefore raises
 the CPU conduit MTU by the tagger's 4-byte overhead while user ports retain the
@@ -114,7 +116,6 @@ Example:
 		reset-deassert-us = <50000>; /* optional, default 100000 */
 		realtek,preserve-boot-config; /* optional */
 		realtek,rtl8372n-led-init; /* optional, RTL8372N only */
-		realtek,dsa-svlan; /* optional, requires PPE S/C VLAN support */
 
 		rtl837x,sds0mode = "10g-kr";
 
@@ -274,13 +275,13 @@ mode change, and relies on the SDK mode routine for its normal post-reset. No
 board compatible, MDIO address, or fixed CPU-port value is used. The property
 requires `realtek,preserve-boot-config` and a non-`off` CPU SerDes mode.
 
-`realtek,dsa-svlan` selects the RTL837x 802.1ad DSA transport. The CPU port is
+The RTL837x 802.1ad DSA transport is unconditional. The CPU port is
 configured as the SVLAN service port and each user port keeps a distinct
 standalone SVID independent of its customer PVID. This permits VLAN-aware
 bridges and routed VLAN interfaces without consuming the customer tag slot for
-DSA identity. The property is opt-in because the Ethernet conduit must classify
-and emit independent S-tags and C-tags; on Qualcomm PPE this requires the
-matching dual-slot flowtable support.
+DSA identity. The Ethernet conduit must classify and emit independent S-tags
+and C-tags; on Qualcomm PPE this requires the matching dual-slot flowtable
+support. GL-BE6500 therefore uses the same transport as the Xiaomi boards.
 
 ## Network Configuration
 
@@ -292,10 +293,8 @@ lan1 lan2 lan3 lan4
 
 OpenWrt board network setup should add these DSA user ports directly to
 `br-lan`. Do not configure this driver through swconfig or `switch_vlan`.
-In the default mode, tag_8021q bridge callbacks replace a port's standalone VID
-with the bridge VID on join and restore it on leave. In SVLAN mode, the source
-SVID remains fixed and bridge membership is represented by the customer VLAN
-table plus the port isolation matrix. Both modes keep a standalone WAN outside
+The source SVID remains fixed and bridge membership is represented by the
+customer VLAN table plus the port isolation matrix. This keeps a standalone WAN outside
 the LAN forwarding domain so traffic cannot bypass routing, firewall, and NAT
 processing.
 
@@ -324,15 +323,14 @@ PVID, and ingress-filter state. The other files
 provide per-instance register, internal PHY, and SerDes access. Mount debugfs
 before use if it is not already mounted.
 
-The tagger logs only the first transmitted and received 802.1Q packet for each
-DSA tree/switch/port. The line includes the encoded VID, packet checksum state,
-and forwarding-offload mark. It also logs the first routed fallback where a
-bridge-originated packet targets a standalone DSA port, plus the first pending
-checksum packet; subsequent packets remain silent.
+The tagger retains per-switch, rate-limited PPPoE discovery/control and decode
+error diagnostics. Normal LCP echo requests/replies are aggregated once per
+minute so they do not consume the discovery budget. `context` identifies the
+`rtl837x-8021ad` transport and its two VLAN slots without packet-path logging.
 
 ## Notes
 
 - RTL837x internal PHY status is handled by a small driver-specific PHY driver.
 - Hardware MIB counters are exported through ethtool stats.
-- Local LAN-to-LAN forwarding is permitted only through a shared tag_8021q
-  bridge VID. Standalone ports retain distinct VIDs behind the CPU conduit.
+- Local LAN-to-LAN forwarding follows customer VLAN membership and bridge
+  isolation. Source-port SVIDs remain distinct across bridge join/leave.
