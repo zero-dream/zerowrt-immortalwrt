@@ -323,10 +323,11 @@ PVID, and ingress-filter state. The other files
 provide per-instance register, internal PHY, and SerDes access. Mount debugfs
 before use if it is not already mounted.
 
-The tagger retains per-switch, rate-limited PPPoE discovery/control and decode
-error diagnostics. Normal LCP echo requests/replies are aggregated once per
-minute so they do not consume the discovery budget. `context` identifies the
-`rtl837x-8021ad` transport and its two VLAN slots without packet-path logging.
+The tagger validates the outer service tag and reports source-port decode
+failures with rate limiting. It does not inspect PPPoE/LCP payloads or keep
+per-switch tracing state. `context` identifies the `rtl837x-8021ad` transport
+and its two VLAN slots on demand; setup no longer takes a separate register
+snapshot for success logging.
 
 ## Notes
 

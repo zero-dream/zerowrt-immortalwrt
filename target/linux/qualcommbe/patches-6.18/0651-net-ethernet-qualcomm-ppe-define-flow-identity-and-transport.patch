@@ -1,9 +1,8 @@
 From: ViKing <viking.yfy@qq.com>
-Subject: [PATCH] net: ethernet: qualcomm: ppe: define ingress flow identity and transport metadata
+Subject: [PATCH] net: ethernet: qualcomm: ppe: define flow identity and transport
 
-Keep source-L3 validity and transport metadata in the flow representation.
-
-Separate the QCA4B virtual-port identity from the common flow encoder so later DSA and PPPoE lifecycle code can consume one validated identity.
+Define source L3 and router-MAC identity primitives and QCA virtual-
+port transport interfaces for common DSA and PPPoE flow installation.
 
 Signed-off-by: ViKing <viking.yfy@qq.com>
 ---
