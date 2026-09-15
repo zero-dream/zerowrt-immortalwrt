@@ -778,7 +778,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  }
  
  /* Netfilter ingress hook on a virtual port's bound device: offload the
-@@ -328,18 +647,104 @@
+@@ -328,18 +647,115 @@
  static void ppe_vp_slot_release(struct ppe_device *ppe_dev,
  				struct ppe_vp *vp, int i)
  {
@@ -791,6 +791,10 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
 -	ret = ppe_vp_hw_set(ppe_dev, PPE_VP_PORT_BASE + i, false);
 +	ppe_vp_hook_unregister(slot, dev);
 +	if (slot->type == PPE_VP_SLOT_QCA4B) {
++		dev_info(ppe_dev->dev,
++			 "QCA4B VP leave: slot=%d vp=%d dev=%s switch_port=%u physical_port=%u refs=%d\n",
++			 i, slot->vp, dev ? dev->name : "<unregistered>",
++			 slot->switch_port, slot->physical_port, slot->refcnt);
 +		ret = ppe_vp_athtag_del(vp, slot);
 +		if (ret) {
 +			slot->poisoned = true;
@@ -877,11 +881,18 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
 +	rcu_assign_pointer(slot->dev, dev);
 +	ppe_flowtable_port_carrier(ppe_dev, slot->vp,
 +				   netif_carrier_ok(dev));
++	dev_info(ppe_dev->dev,
++		 "QCA4B VP join: slot=%d vp=%d dev=%s switch_port=%u physical_port=%u carrier=%u refs=%d\n",
++		 free, slot->vp, dev->name, slot->switch_port,
++		 slot->physical_port, netif_carrier_ok(dev), slot->refcnt);
 +	return 0;
 +
 +err_hw:
 +	ppe_vp_hw_set(ppe_dev, slot->vp, physical_port, 0, false);
 +err_reset:
++	dev_warn(ppe_dev->dev,
++		 "QCA4B VP join failed: slot=%d vp=%d dev=%s ret=%d\n",
++		 free, slot->vp, dev->name, ret);
 +	slot->refcnt = 0;
 +	ppe_vp_slot_reset(slot);
 +	return ret;
@@ -1145,7 +1156,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	mutex_lock(&vp->lock);
  	for (i = 0; i < PPE_VP_SLOTS; i++) {
  		struct net_device *bound;
-@@ -604,13 +1168,28 @@
+@@ -604,13 +1168,32 @@
  		}
  
  		if (event == NETDEV_UNREGISTER) {
@@ -1173,6 +1184,10 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
 +			}
  			carrier = PPE_VP_PORT_BASE + i;
  			carrier_up = netif_carrier_ok(dev);
++			if (vp->slots[i].type == PPE_VP_SLOT_QCA4B)
++				dev_info(vp->ppe_dev->dev,
++					 "QCA4B VP carrier: slot=%d vp=%d dev=%s carrier=%u event=%lu\n",
++					 i, vp->slots[i].vp, dev->name, carrier_up, event);
  		}
 @@ -622,6 +1201,16 @@
  		ppe_flowtable_port_carrier(vp->ppe_dev, carrier, carrier_up);

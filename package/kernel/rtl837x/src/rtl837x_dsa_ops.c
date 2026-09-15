@@ -1064,10 +1064,18 @@ static int rtl837x_port_bridge_join(struct dsa_switch *ds, int port, struct dsa_
 	if (!ret)
 		ret = rtl837x_update_svlan_bridge_membership(gsw);
 	rtl837x_sdk_unlock(gsw);
-	if (ret)
+	if (ret) {
+		dev_err(gsw->dev,
+			"SVLAN bridge join failed: port=%d bridge=%s ret=%d\n",
+			port, bridge.dev->name, ret);
 		return ret;
+	}
 
 	*tx_fwd_offload = true;
+	dev_info(gsw->dev,
+		 "SVLAN bridge join: port=%d bridge=%s source-svid=%d\n",
+		 port, bridge.dev->name,
+		 gsw->tag8021q_pvid_valid[port] ? gsw->tag8021q_pvid[port] : -1);
 
 	return 0;
 }
@@ -1086,8 +1094,13 @@ static void rtl837x_port_bridge_leave(struct dsa_switch *ds, int port, struct ds
 	rtl837x_sdk_unlock(gsw);
 	if (ret)
 		dev_err(gsw->dev,
-			"failed to update SVLAN bridge state after leave on port %d: %d\n",
-			port, ret);
+			"SVLAN bridge leave failed: port=%d bridge=%s ret=%d\n",
+			port, bridge.dev->name, ret);
+	else
+		dev_info(gsw->dev,
+			 "SVLAN bridge leave: port=%d bridge=%s source-svid=%d\n",
+			 port, bridge.dev->name,
+			 gsw->tag8021q_pvid_valid[port] ? gsw->tag8021q_pvid[port] : -1);
 }
 
 static int __rtl837x_port_vlan_filtering(struct dsa_switch *ds, int port, bool vlan_filtering, struct netlink_ext_ack *extack)

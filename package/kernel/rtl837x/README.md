@@ -3,6 +3,12 @@
 This OpenWrt kernel package provides a Linux DSA driver for Realtek RTL837x
 switch chips.
 
+Bridge membership changes report `SVLAN bridge join/leave` with the physical
+port, bridge name and standalone source SVID after successful programming.
+Failed changes report their return code. Probe retries and registration do not
+emit the former `RTL slot` lifecycle messages; chip, MDIO and initialization
+errors remain available.
+
 The driver was refactored from the swconfig/GSW driver at:
 
 https://github.com/RuijieNetworksCommunity/rtl837x-gsw-driver.git
@@ -322,6 +328,13 @@ VLAN-1 membership, and each port's live isolation mask, PVID, tag PVID, bridge
 PVID, and ingress-filter state. The other files
 provide per-instance register, internal PHY, and SerDes access. Mount debugfs
 before use if it is not already mounted.
+
+Kernel logs identify each RTL instance by its MDIO address (`mdio=0`,
+`mdio=29`, etc.). A complete lifecycle is emitted as `RTL slot join begin`,
+`probe`, `init`, `dsa-register`, and `RTL slot join done`; removal and shutdown
+emit the matching leave stages. This keeps the two switch slots distinguishable
+when both chips share the same MDIO bus and records the stage and return code
+when initialization fails.
 
 The tagger validates the outer service tag and reports source-port decode
 failures with rate limiting. It does not inspect PPPoE/LCP payloads or keep
