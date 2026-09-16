@@ -26,6 +26,7 @@ by the single VLAN dissector key.
 
 Signed-off-by: VIKINGYFY <vikingyfy@gmail.com>
 ---
+---
 --- a/drivers/net/ethernet/qualcomm/ppe/ppe_flowtable.c
 +++ b/drivers/net/ethernet/qualcomm/ppe/ppe_flowtable.c
 @@ -1991,6 +1991,7 @@
@@ -179,7 +180,7 @@ Signed-off-by: VIKINGYFY <vikingyfy@gmail.com>
  	skb_pull(skb, mac_len);
  
  	return NF_ACCEPT;
-@@ -833,7 +864,8 @@
+@@ -844,7 +875,8 @@
  	return PPE_VP_PORT_BASE + free;
  }
  
@@ -189,7 +190,7 @@ Signed-off-by: VIKINGYFY <vikingyfy@gmail.com>
  {
  	struct ppe_vp *vp = ppe_dev->vp;
  	int i, ret;
-@@ -853,6 +885,20 @@
+@@ -864,6 +896,20 @@
  			ret = -EOPNOTSUPP;
  			goto out;
  		}
@@ -210,7 +211,7 @@ Signed-off-by: VIKINGYFY <vikingyfy@gmail.com>
  		vp->slots[i].refcnt++;
  		ret = vp->slots[i].vp;
  		goto out;
-@@ -863,6 +909,13 @@
+@@ -874,6 +920,13 @@
  		goto out;
  	for (i = 0; i < PPE_VP_SLOTS; i++) {
  		if (rcu_access_pointer(vp->slots[i].dev) == dev) {
@@ -224,7 +225,7 @@ Signed-off-by: VIKINGYFY <vikingyfy@gmail.com>
  			vp->slots[i].refcnt++;
  			ret = vp->slots[i].vp;
  			goto out;
-@@ -1002,8 +1055,12 @@
+@@ -1013,8 +1066,12 @@
  
  	if (!vpt || i < 0 || i >= PPE_VP_SLOTS)
  		return -EINVAL;
@@ -239,7 +240,7 @@ Signed-off-by: VIKINGYFY <vikingyfy@gmail.com>
  
  	ret = rhashtable_insert_fast(&vpt->slots[i].flows, &flow->node,
  				     ppe_vp_flow_params);
-@@ -1112,6 +1169,11 @@
+@@ -1123,6 +1180,11 @@
  			   dev ? netif_carrier_ok(dev) : 0, slot->athtag_active,
  			   slot->poisoned, prx_ret, prx, eg_ret,
  			   eg_vp[2], eg_vp[1], eg_vp[0]);

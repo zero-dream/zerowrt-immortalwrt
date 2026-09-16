@@ -6,6 +6,7 @@ Map the eight Linux priorities across the three available hardware QoS
 bands, keeping action acceptance and its hardware effect together.
 
 Signed-off-by: ViKing <viking.yfy@qq.com>
+---
 --- a/drivers/net/ethernet/qualcomm/ppe/ppe_config.c
 +++ b/drivers/net/ethernet/qualcomm/ppe/ppe_config.c
 @@ -133,6 +133,7 @@
@@ -865,7 +866,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  		default:
  			ret = -EOPNOTSUPP;
  			goto err_free;
-@@ -3163,8 +3171,9 @@
+@@ -3165,8 +3173,9 @@
  	rhashtable_walk_enter(&ft->flows, &iter);
  	rhashtable_walk_start(&iter);
  	while ((flow = rhashtable_walk_next(&iter))) {
@@ -876,7 +877,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  
  		if (IS_ERR(flow)) {
  			if (PTR_ERR(flow) == -EAGAIN)
-@@ -3172,9 +3181,17 @@
+@@ -3174,9 +3183,17 @@
  			break;
  		}
  
@@ -897,7 +898,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  		ppe_flow_stats_get(ft->ppe_dev, flow->index, &packets, &bytes);
  
  		if (flow->entry.is_ipv6)
-@@ -3190,10 +3207,13 @@
+@@ -3192,10 +3209,13 @@
  				   &flow->entry.dip.ip4,
  				   be16_to_cpu(flow->entry.dport));
  		seq_printf(seq,

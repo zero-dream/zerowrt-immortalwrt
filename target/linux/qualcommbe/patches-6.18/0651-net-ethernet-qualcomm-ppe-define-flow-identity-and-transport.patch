@@ -6,6 +6,7 @@ port transport interfaces for common DSA and PPPoE flow installation.
 
 Signed-off-by: ViKing <viking.yfy@qq.com>
 ---
+---
 --- a/drivers/net/ethernet/qualcomm/ppe/ppe_flow.c
 +++ b/drivers/net/ethernet/qualcomm/ppe/ppe_flow.c
 @@ -24,6 +24,7 @@
@@ -244,7 +245,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  		    const struct ppe_flow_nexthop *nh);
 --- a/drivers/net/ethernet/qualcomm/ppe/ppe_vp.c
 +++ b/drivers/net/ethernet/qualcomm/ppe/ppe_vp.c
-@@ -951,6 +951,31 @@
+@@ -965,6 +965,31 @@
  	return ret;
  }
  

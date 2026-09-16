@@ -9,6 +9,7 @@ owners and keep aggregate failure counters.
 
 Signed-off-by: ViKing <viking.yfy@qq.com>
 ---
+---
 --- a/drivers/net/ethernet/qualcomm/ppe/ppe_flowtable.c
 +++ b/drivers/net/ethernet/qualcomm/ppe/ppe_flowtable.c
 @@ -24,6 +24,7 @@
@@ -2159,7 +2160,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  		case 148:
  			return "L3 route host mismatch action";
  		case 162:
-@@ -3311,6 +4143,9 @@
+@@ -3313,6 +4145,9 @@
  		seq_printf(seq, " %s:%ld", ppe_ft_reject_names[i],
  			   atomic_long_read(&ft->rejects[i]));
  	seq_putc(seq, '\n');
@@ -2169,7 +2170,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  
  	rhashtable_walk_enter(&ft->flows, &iter);
  	rhashtable_walk_start(&iter);
-@@ -3318,6 +4153,7 @@
+@@ -3320,6 +4155,7 @@
  		u32 f[3] = {}, packets = 0, qos[2] = {};
  		u64 bytes = 0;
  		u8 hw_priority, hw_profile;
@@ -2177,7 +2178,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  
  		if (IS_ERR(flow)) {
  			if (PTR_ERR(flow) == -EAGAIN)
-@@ -3325,18 +4161,19 @@
+@@ -3327,18 +4163,19 @@
  			break;
  		}
  
@@ -2206,7 +2207,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  
  		if (flow->entry.is_ipv6)
  			seq_printf(seq, "[%pI6c]:%u -> [%pI6c]:%u",
-@@ -3351,14 +4188,14 @@
+@@ -3353,14 +4190,14 @@
  				   &flow->entry.dip.ip4,
  				   be16_to_cpu(flow->entry.dport));
  		seq_printf(seq,
@@ -2223,7 +2224,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  			   packets, (unsigned long long)bytes);
  	}
  	rhashtable_walk_stop(&iter);
-@@ -3388,8 +4225,26 @@
+@@ -3390,8 +4227,26 @@
  static int ppe_ft_resource_stats_show(struct seq_file *seq, void *data)
  {
  	struct ppe_flowtable *ft = seq->private;
@@ -2250,7 +2251,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	seq_printf(seq,
  		   "nexthop active:%u capacity:%u alloc:%lu reuse:%lu free:%lu\n",
  		   ft->nexthop_active,
-@@ -3658,8 +4513,8 @@
+@@ -3660,8 +4515,8 @@
  	for (i = 0; i < PPE_FT_PPPOE_SESSIONS; i++) {
  		if (!ft->pppoe[i].ref.refcnt)
  			continue;

@@ -8,6 +8,7 @@ counters before enabling a recycled hardware row.
 
 Signed-off-by: ViKing <viking.yfy@qq.com>
 ---
+---
 --- /dev/null
 +++ b/drivers/net/ethernet/qualcomm/ppe/ppe_flow_account.h
 @@ -0,0 +1,104 @@
@@ -159,7 +160,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	struct list_head block_cb_list;
  };
  
-@@ -2565,6 +2572,8 @@
+@@ -2570,6 +2577,8 @@
  	ppe_ft_tunnel_put(ft, flow->tunnel);
  	ppe_vp_put(ft->ppe_dev, flow->vp);
  	ppe_vp_put(ft->ppe_dev, flow->ivp);
@@ -168,7 +169,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	if (flow->egress_dev) {
  		dev_put(flow->egress_dev);
  		flow->egress_dev = NULL;
-@@ -2636,6 +2645,12 @@
+@@ -2641,6 +2650,12 @@
  {
  	int ret;
  
@@ -181,7 +182,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	ret = ppe_flow_entry_matches(ft->ppe_dev, flow->index, &flow->entry);
  	if (!ret)
  		ret = ppe_flow_entry_enable(ft->ppe_dev, flow->index, false);
-@@ -2649,6 +2664,8 @@
+@@ -2654,6 +2669,8 @@
  
  static void ppe_ft_flow_release(struct ppe_ft_flow *flow)
  {
@@ -190,7 +191,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	if (flow->egress_dev)
  		dev_put(flow->egress_dev);
  	kfree(flow);
-@@ -3199,6 +3216,9 @@
+@@ -3204,6 +3221,9 @@
  				master ? master->dev_addr : idev->dev_addr);
  		rcu_read_unlock();
  		imtu = idev->mtu;
@@ -200,7 +201,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  
  		if (edma_port_dev_check(idev)) {
  			struct edma_port_priv *ipriv = netdev_priv(idev);
-@@ -3267,6 +3287,8 @@
+@@ -3272,6 +3292,8 @@
  	}
  
  	reject_reason = PPE_FT_REJECT_EGRESS_VP;
@@ -209,7 +210,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	if (!tunnel_encap) {
  		if (edma_port_dev_check(odev)) {
  			port_priv = netdev_priv(odev);
-@@ -3377,6 +3399,8 @@
+@@ -3382,6 +3404,8 @@
  	flow->rule.priority = f->common.prio;
  
  	mutex_lock(&ft->lock);
@@ -218,7 +219,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	ret = ppe_ft_flow_refresh(ft, flow, tunnel_flow);
  	if (ret) {
  		if (ret > 0)
-@@ -3707,6 +3731,15 @@
+@@ -3712,6 +3736,15 @@
  		goto err_host;
  	flow->index = ret;
  
@@ -234,7 +235,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	ret = ppe_flow_entry_enable(ft->ppe_dev, flow->index, true);
  	ret = ppe_ft_resource_result(ft, PPE_FT_RES_FLOW_ENABLE, ret);
  	if (ret)
-@@ -3827,6 +3860,10 @@
+@@ -3832,6 +3865,10 @@
  err_free:
  	if (ret)
  		atomic_long_inc(&ft->rejects[reject_reason]);
@@ -245,7 +246,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	if (flow && flow->egress_dev)
  		dev_put(flow->egress_dev);
  	kfree_rcu(flow, rcu);
-@@ -4007,10 +4044,16 @@
+@@ -4012,10 +4049,16 @@
  
  	ret = ppe_flow_stats_get(ft->ppe_dev, flow->index, &packets, &bytes);
  	if (!ret && (packets != flow->packets || bytes != flow->bytes)) {
@@ -264,7 +265,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  				  FLOW_ACTION_HW_STATS_DELAYED);
  		flow->packets = packets;
  		flow->bytes = bytes;
-@@ -4391,6 +4434,37 @@
+@@ -4398,6 +4441,37 @@
  	}
  }
  
@@ -302,7 +303,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  /**
   * ppe_flowtable_setup - Set up the flowtable offload state
   * @ppe_dev: PPE device
-@@ -4450,9 +4524,15 @@
+@@ -4457,9 +4531,15 @@
  
  	hash_init(ft->hosts);
  	ft->ppp_nb.notifier_call = ppe_ft_ppp_event;
@@ -319,7 +320,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  	if (ret) {
  		ppe_dev->flowtable = NULL;
  		rhashtable_destroy(&ft->flows);
-@@ -4502,6 +4582,7 @@
+@@ -4509,6 +4589,7 @@
  		return;
  
  	WARN_ON(!list_empty(&ft->block_cb_list));

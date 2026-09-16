@@ -691,18 +691,7 @@ int rtl8372n_hw_init(struct rtk_gsw *gsw, rtl837x_pnswap_cfg_t swap_cfg)
 	if (ret)
 		return ret;
 
-	ret = rtk_vlan_reset();
-	if (ret) {
-		dev_err(gsw->dev, "rtk_vlan_reset failed, error:%d\n", ret);
-		return -EPERM;
-	}
-
-	ret = rtk_vlan_init();
-	if (ret) {
-		dev_err(gsw->dev, "rtk_vlan_init failed, error:%d\n", ret);
-		return -EPERM;
-	}
-
+	/* DSA setup owns VLAN/SVLAN table initialization after registration. */
 	ret = rtl8372n_igmp_init(gsw);
 	if (ret) {
 		dev_err(gsw->dev, "rtl8372n_igmp_init failed, error:%d\n", ret);
