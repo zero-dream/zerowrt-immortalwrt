@@ -3,6 +3,7 @@
 
 #include <errno.h>
 #include <stddef.h>
+#include <string.h>
 
 /* Mode/reset/event semantics: TMI7604R V1.3 and TMI7608R V0.3, pp.14-23.
  * Board wiring, ADC packing and undocumented setup values: RP01/RP02 pse_ctl.
@@ -18,13 +19,26 @@ const struct tmi_board tmi_boards[2] = {
 static int read_reg(struct tmi_io *io, uint8_t reg, uint8_t *value)
 {
 	io->failed_reg = reg;
+	io->operation = "read";
 	return io->read(io->ctx, reg, value);
 }
 
 static int write_reg(struct tmi_io *io, uint8_t reg, uint8_t value)
 {
 	io->failed_reg = reg;
+	io->operation = "write";
 	return io->write(io->ctx, reg, value);
+}
+
+static int verify_value(struct tmi_io *io, uint8_t reg, uint8_t expected, uint8_t value)
+{
+	if (value == expected)
+		return 0;
+	io->failed_reg = reg;
+	io->operation = "verify";
+	io->expected = expected;
+	io->actual = value;
+	return -EIO;
 }
 
 static int verify_reg(struct tmi_io *io, uint8_t reg, uint8_t expected)
@@ -32,9 +46,7 @@ static int verify_reg(struct tmi_io *io, uint8_t reg, uint8_t expected)
 	uint8_t value;
 	int ret = read_reg(io, reg, &value);
 
-	if (ret)
-		return ret;
-	return value == expected ? 0 : -EIO;
+	return ret ? ret : verify_value(io, reg, expected, value);
 }
 
 static int write_verify(struct tmi_io *io, uint8_t reg, uint8_t value)
@@ -161,25 +173,12 @@ static int check_supply(struct tmi_io *io)
 	return -ERANGE;
 }
 
-int tmi_disable(struct tmi_io *io, const struct tmi_board *board)
+static int confirm_off(struct tmi_io *io, uint8_t mask)
 {
-	int ret, first = 0;
-	unsigned int group, attempt;
-	uint8_t powered, good, first_reg = 0;
+	unsigned int attempt;
+	uint8_t powered, good;
+	int ret;
 
-	io->stage = "shutdown-modes";
-	/* Try every mode group despite bus errors, preserving the first error. */
-	for (group = 0; group < board->channels / 4; group++) {
-		ret = write_verify(io, 0x1f + group, 0);
-		if (ret && !first) {
-			first = ret;
-			first_reg = io->failed_reg;
-		}
-	}
-	if (first) {
-		io->failed_reg = first_reg;
-		return first;
-	}
 	io->stage = "shutdown-confirm";
 	for (attempt = 0; attempt < 20; attempt++) {
 		ret = read_reg(io, 0x1c, &powered);
@@ -188,11 +187,41 @@ int tmi_disable(struct tmi_io *io, const struct tmi_board *board)
 		ret = read_reg(io, 0x1d, &good);
 		if (ret)
 			return ret;
-		if (!(powered | good))
+		if (!((powered | good) & mask))
 			return 0;
 		io->delay(io->ctx, 100);
 	}
 	return -ETIMEDOUT;
+}
+
+int tmi_disable(struct tmi_io *io, const struct tmi_board *board)
+{
+	int ret, first = 0;
+	unsigned int group;
+	uint8_t expected = 0, actual = 0;
+	int first_reg = -1;
+	const char *operation = NULL;
+
+	io->stage = "shutdown-modes";
+	/* Try every mode group despite bus errors, preserving the first error. */
+	for (group = 0; group < board->channels / 4; group++) {
+		ret = write_verify(io, 0x1f + group, 0);
+		if (ret && !first) {
+			first = ret;
+			first_reg = io->failed_reg;
+			operation = io->operation;
+			expected = io->expected;
+			actual = io->actual;
+		}
+	}
+	if (first) {
+		io->failed_reg = first_reg;
+		io->operation = operation;
+		io->expected = expected;
+		io->actual = actual;
+		return first;
+	}
+	return confirm_off(io, (1U << board->channels) - 1);
 }
 
 static int enable_detection(struct tmi_io *io, const struct tmi_board *board,
@@ -221,13 +250,13 @@ int tmi_initialize(struct tmi_io *io, const struct tmi_board *board,
 {
 	static const uint8_t setup[][2] = {
 		{ 0x01, 0xe7 }, { 0x54, 0xe7 }, { 0x32, 0xff }, { 0x76, 0x23 },
-		{ 0x88, 0x3a },
 		{ 0x2e, 0x33 }, { 0x2f, 0x33 }, { 0x30, 0x33 }, { 0x31, 0x33 },
 	};
 	unsigned int i;
 	int ret = tmi_validate(board, policy);
 
 	io->stage = "validate";
+	io->failed_reg = -1;
 	if (ret)
 		return ret;
 	/* Reset pin straps can select auto mode. Quiesce before programming. */
@@ -248,9 +277,12 @@ int tmi_initialize(struct tmi_io *io, const struct tmi_board *board,
 	ret = set_budget(io, policy->budget_mw);
 	if (ret)
 		return ret;
+	ret = write_verify(io, 0x88, 0x3a);
+	if (ret)
+		return ret;
 	io->stage = "protection";
-	/* Keep IEEE af/at classification; disable proprietary Class4+ (2 A ADC). */
-	ret = write_verify(io, 0x2d, 0);
+	/* Retain automatic detection; Class4+ extends classification, not PWR_ON. */
+	ret = write_verify(io, 0x2d, policy->class4plus ? tmi_board_mask(board) : 0);
 	if (ret)
 		return ret;
 	ret = write_verify(io, 0x21, tmi_board_mask(board)); /* DC disconnect */
@@ -272,17 +304,23 @@ int tmi_set_policy(struct tmi_io *io, const struct tmi_board *board,
 	int ret = tmi_validate(board, policy);
 
 	io->stage = "validate";
+	io->failed_reg = -1;
 	if (ret)
 		return ret;
-	if (old->budget_mw == policy->budget_mw && old->mask == policy->mask)
-		return 0;
-	if (old->budget_mw != policy->budget_mw) {
+	if (old->budget_mw == policy->budget_mw && old->mask == policy->mask &&
+	    old->class4plus == policy->class4plus)
+		return policy->mask ? 0 : confirm_off(io, (1U << board->channels) - 1);
+	if (old->budget_mw != policy->budget_mw || old->class4plus != policy->class4plus) {
 		/* Update two budget bytes with outputs off, never at a transient limit. */
 		ret = tmi_disable(io, board);
 		if (ret)
 			return ret;
 		io->stage = "budget";
 		ret = set_budget(io, policy->budget_mw);
+		if (ret)
+			return ret;
+		io->stage = "protection";
+		ret = write_verify(io, 0x2d, policy->class4plus ? tmi_board_mask(board) : 0);
 		if (ret)
 			return ret;
 		retained = 0;
@@ -295,6 +333,12 @@ int tmi_set_policy(struct tmi_io *io, const struct tmi_board *board,
 	ret = enable_detection(io, board, retained, policy->mask);
 	if (ret)
 		return ret;
+	if (!policy->mask || (old->mask & ~policy->mask)) {
+		ret = confirm_off(io, !policy->mask ? (1U << board->channels) - 1 :
+				  old->mask & ~policy->mask);
+		if (ret)
+			return ret;
+	}
 	return tmi_verify_policy(io, board, policy);
 }
 
@@ -316,7 +360,51 @@ int tmi_verify_policy(struct tmi_io *io, const struct tmi_board *board,
 	ret = verify_reg(io, 0x78, value >> 8);
 	if (ret)
 		return ret;
-	return verify_reg(io, 0x2d, 0);
+	ret = verify_reg(io, 0x21, tmi_board_mask(board));
+	if (ret)
+		return ret;
+	ret = verify_reg(io, 0x22, policy->mask);
+	if (ret)
+		return ret;
+	ret = verify_reg(io, 0x23, policy->mask);
+	if (ret)
+		return ret;
+	return verify_reg(io, 0x2d, policy->class4plus ? tmi_board_mask(board) : 0);
+}
+
+int tmi_check_policy_status(struct tmi_io *io, const struct tmi_board *board,
+			    const struct tmi_policy *policy, const struct tmi_status *status)
+{
+	unsigned int group, value = budget_value(policy->budget_mw);
+	int ret;
+
+	/* Detect reset/lost configuration from the already collected snapshot.
+	 * Do not silently continue under strap defaults or re-enable outputs.
+	 */
+	io->stage = "configuration-monitor";
+	for (group = 0; group < board->channels / 4; group++) {
+		ret = verify_value(io, 0x1f + group, port_modes(policy->mask, 0, group),
+				   status->modes[group]);
+		if (ret)
+			return ret;
+	}
+	ret = verify_value(io, 0x21, tmi_board_mask(board), status->disconnect);
+	if (ret)
+		return ret;
+	ret = verify_value(io, 0x22, policy->mask, status->detect);
+	if (ret)
+		return ret;
+	ret = verify_value(io, 0x23, policy->mask, status->classify);
+	if (ret)
+		return ret;
+	ret = verify_value(io, 0x2d, policy->class4plus ? tmi_board_mask(board) : 0,
+			   status->class4plus);
+	if (ret)
+		return ret;
+	ret = verify_value(io, 0x77, value & 0xff, status->budget_raw & 0xff);
+	if (ret)
+		return ret;
+	return verify_value(io, 0x78, value >> 8, status->budget_raw >> 8);
 }
 
 int tmi_read_status(struct tmi_io *io, const struct tmi_board *board,
@@ -327,6 +415,26 @@ int tmi_read_status(struct tmi_io *io, const struct tmi_board *board,
 	int ret;
 
 	io->stage = "status";
+	for (i = 0; i < board->channels / 4; i++) {
+		ret = read_reg(io, 0x1f + i, &sample.modes[i]);
+		if (ret)
+			return ret;
+	}
+	ret = read_reg(io, 0x21, &sample.disconnect);
+	if (ret)
+		return ret;
+	ret = read_reg(io, 0x22, &sample.detect);
+	if (ret)
+		return ret;
+	ret = read_reg(io, 0x23, &sample.classify);
+	if (ret)
+		return ret;
+	ret = read_word(io, 0x77, &sample.budget_raw);
+	if (ret)
+		return ret;
+	ret = read_reg(io, 0x2d, &sample.class4plus);
+	if (ret)
+		return ret;
 	ret = read_reg(io, 0x00, &sample.summary);
 	if (ret)
 		return ret;
@@ -354,7 +462,11 @@ int tmi_read_status(struct tmi_io *io, const struct tmi_board *board,
 		ret = read_word(io, 0x33 + 4 * channel, &raw);
 		if (ret)
 			return ret;
-		/* 1.956 mA/LSB for af/at, four fraction bits in factory ADC word. */
+		/* Preserve raw ADC: Class4+ uses twice the af/at current scale.
+		 * The supplied PDFs do not define the active-range status encoding;
+		 * an enabled Class4+ bit alone does not identify the detected PD class.
+		 */
+		sample.current_raw[port] = raw;
 		sample.current_ma[port] = raw * 1956U / 16000U;
 		ret = read_word(io, 0x35 + 4 * channel, &raw);
 		if (ret)
@@ -362,6 +474,34 @@ int tmi_read_status(struct tmi_io *io, const struct tmi_board *board,
 		sample.voltage_mv[port] = voltage_mv(raw);
 	}
 	/* Never publish a partly updated snapshot after an I2C failure. */
+	*status = sample;
+	return 0;
+}
+
+int tmi_poll_status(struct tmi_io *io, const struct tmi_board *board,
+		    struct tmi_status *status)
+{
+	struct tmi_status sample;
+	unsigned int i;
+	uint8_t event;
+	int ret;
+
+	/* Only the owning daemon consumes the clear-on-read aliases. Never
+	 * retry these reads in the transport: a failed transfer may have cleared
+	 * the latch already. Keep every successful read across later failures.
+	 */
+	io->stage = "events";
+	for (i = 0; i < TMI_EVENTS; i++) {
+		ret = read_reg(io, 0x03 + 2 * i, &event);
+		if (ret)
+			return ret;
+		io->pending_events[i] |= event;
+	}
+	ret = tmi_read_status(io, board, &sample);
+	if (ret)
+		return ret;
+	memcpy(sample.events, io->pending_events, sizeof(sample.events));
+	memset(io->pending_events, 0, sizeof(io->pending_events));
 	*status = sample;
 	return 0;
 }
