@@ -1,0 +1,281 @@
+/* Host fixtures. Production functions are inserted by run-core.py. */
+#ifndef AUDIT_SONIC_DISABLED
+#define CONFIG_NF_NAT_FULLCONE 1
+#else
+#define CONFIG_NF_NAT_FULLCONE 0
+#endif
+#include <assert.h>
+#include <errno.h>
+#include <sched.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdatomic.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stddef.h>
+#include <pthread.h>
+#include <arpa/inet.h>
+typedef uint16_t __be16;
+typedef uint16_t u16;
+#define CONNTRACK_LOCKS 32
+#define NF_NAT_MAX_ATTEMPTS 128
+#define IP_CT_DIR_ORIGINAL 0
+#define IP_CT_DIR_REPLY 1
+#define NFPROTO_IPV4 2
+#define NFPROTO_IPV6 10
+#define NF_NAT_RANGE_MAP_IPS 1
+#define NF_NAT_RANGE_PROTO_SPECIFIED 2
+#define NF_NAT_RANGE_PROTO_RANDOM_ALL 20
+#define NF_NAT_RANGE_PROTO_RANDOM_FULLY 16
+#define NF_NAT_RANGE_PROTO_OFFSET 32
+#define NF_NAT_RANGE_FULLCONE 1024
+#define CONFIG_NF_CT_PROTO_GRE 1
+#define CONFIG_NF_CT_PROTO_SCTP 1
+#define CONFIG_NF_CT_PROTO_UDPLITE 1
+#define IS_ENABLED(x) (x)
+#define IPS_SRC_NAT 16
+#define IPS_DST_NAT 32
+#define IPS_SRC_NAT_DONE 128
+#define IPS_DST_NAT_DONE 256
+#define IPS_CONFIRMED 8
+#define IPS_DYING 512
+#define NF_ACCEPT 1
+#define NF_DROP 0
+#define WARN_ON(x) (!!(x))
+#define unlikely(x) (x)
+#define pr_debug(...) ((void)0)
+#define swap(a,b) do { typeof(a) temp = a; a = b; b = temp; } while(0)
+#define EXPORT_SYMBOL(x)
+#define lockdep_assert_held(lock) ((void)0)
+#define container_of(p,t,m) ((t*)((char*)(p)-offsetof(t,m)))
+typedef pthread_mutex_t spinlock_t;
+static _Thread_local bool retiring;
+static spinlock_t *expected_lock;
+static atomic_bool retire_attempted;
+static void spin_lock_bh(spinlock_t *l) {
+ if (retiring && l == expected_lock) {
+  assert(pthread_mutex_trylock(l) == EBUSY);
+  atomic_store(&retire_attempted, true);
+ }
+ assert(pthread_mutex_lock(l)==0);
+}
+static void spin_unlock_bh(spinlock_t *l) { assert(pthread_mutex_unlock(l)==0); }
+struct hlist_node { _Atomic(struct hlist_node *) next; _Atomic(struct hlist_node *) *pprev; };
+struct hlist_head { _Atomic(struct hlist_node *) first; };
+#define hlist_for_each_entry_rcu(p,h,m) for (struct hlist_node *node = atomic_load(&(h)->first); node && ((p)=container_of(node,struct nf_conn,m)); node=atomic_load(&node->next))
+static void hlist_add_head_rcu(struct hlist_node *n, struct hlist_head *h) {
+ struct hlist_node *first=atomic_load(&h->first);
+ atomic_store(&n->next,first); n->pprev=&h->first;
+ if(first) first->pprev=&n->next;
+ atomic_store(&h->first,n);
+}
+static void hlist_del_rcu(struct hlist_node *n) {
+ assert(n->pprev && atomic_load(n->pprev)==n);
+ struct hlist_node *next=atomic_load(&n->next);
+ atomic_store(n->pprev,next); if(next) next->pprev=n->pprev;
+}
+union nf_inet_addr { uint32_t all[4]; uint32_t ip; };
+union nf_conntrack_man_proto { uint16_t all; struct {uint16_t id;} icmp; struct {uint16_t key;} gre; };
+struct nf_conntrack_man { union nf_inet_addr u3; union nf_conntrack_man_proto u; uint16_t l3num; };
+struct nf_conntrack_tuple { struct nf_conntrack_man src; struct { union nf_inet_addr u3; union nf_conntrack_man_proto u; uint8_t protonum; } dst; };
+struct nf_conntrack_zone { unsigned int id, reply; };
+struct net {unsigned int id;};
+struct nf_conn {
+ struct {struct nf_conntrack_tuple tuple;} tuplehash[2];
+ struct net *net; struct nf_conntrack_zone zone;
+ struct hlist_node nat_bysource, nat_by_manip_src;
+ bool nat_fullcone; _Atomic(unsigned long) status;
+ struct nf_conn *master; bool helper;
+};
+struct nf_nat_range2 { unsigned int flags; union nf_inet_addr min_addr,max_addr; union nf_conntrack_man_proto min_proto,max_proto,base_proto; };
+enum nf_nat_manip_type {NF_NAT_MANIP_SRC, NF_NAT_MANIP_DST};
+static spinlock_t nf_nat_locks[CONNTRACK_LOCKS],nf_nat_fullcone_locks[CONNTRACK_LOCKS],nf_nat_manip_src_locks[CONNTRACK_LOCKS];
+static struct hlist_head nf_nat_bysource[256],nf_nat_by_manip_src[256];
+static struct net nets[2]={{1},{2}};
+static bool nf_inet_addr_cmp(const union nf_inet_addr *a,const union nf_inet_addr *b){return !memcmp(a,b,sizeof(*a));}
+static struct net *nf_ct_net(const struct nf_conn *ct){return ct->net;}
+static const struct nf_conntrack_zone *nf_ct_zone(const struct nf_conn *ct){return &ct->zone;}
+static void pause_for_recycle(const struct nf_conn *ct);
+static bool nf_ct_zone_equal(const struct nf_conn *ct,const struct nf_conntrack_zone *z,int d){bool equal=d ? ct->zone.reply==z->reply : ct->zone.id==z->id; if (equal && d) pause_for_recycle(ct); return equal;}
+static bool net_eq(const struct net *a,const struct net *b){return a==b;}
+static bool nf_ct_is_confirmed(const struct nf_conn *ct){return ct->status & IPS_CONFIRMED;}
+static bool nf_ct_is_dying(const struct nf_conn *ct){return ct->status & IPS_DYING;}
+static unsigned nf_ct_protonum(const struct nf_conn *ct){return ct->tuplehash[0].tuple.dst.protonum;}
+static bool nfct_help(const struct nf_conn *ct){return ct->helper;}
+static bool nfct_seqadj(const struct nf_conn *ct){return true;}
+static bool nfct_seqadj_ext_add(struct nf_conn *ct){return true;}
+static bool nf_nat_initialized(const struct nf_conn *ct,enum nf_nat_manip_type m){return ct->status & (m==NF_NAT_MANIP_SRC?IPS_SRC_NAT_DONE:IPS_DST_NAT_DONE);}
+static void nf_ct_invert_tuple(struct nf_conntrack_tuple *r,const struct nf_conntrack_tuple *t){
+ memset(r,0,sizeof(*r));r->src.u3=t->dst.u3;r->src.u=t->dst.u;r->src.l3num=t->src.l3num;r->dst.u3=t->src.u3;r->dst.u=t->src.u;r->dst.protonum=t->dst.protonum;
+}
+static bool nf_ct_tuple_equal(const struct nf_conntrack_tuple *a,const struct nf_conntrack_tuple *b){return !memcmp(a,b,sizeof(*a));}
+static void nf_conntrack_alter_reply(struct nf_conn *ct,const struct nf_conntrack_tuple *r){ct->tuplehash[1].tuple=*r;}
+static unsigned hash_by_src(const struct net *net,const struct nf_conntrack_zone *z,const struct nf_conntrack_tuple *t){return (t->src.u3.ip*17u + ntohs(t->src.u.all)*31u +t->dst.protonum*23u+t->src.l3num*13u+net->id*7u+z->id)%256;}
+static bool l4proto_in_range(const struct nf_conntrack_tuple *t,enum nf_nat_manip_type m,const union nf_conntrack_man_proto *a,const union nf_conntrack_man_proto *b){unsigned p=ntohs(m==NF_NAT_MANIP_SRC?t->src.u.all:t->dst.u.all);return p>=ntohs(a->all)&&p<=ntohs(b->all);}
+static bool nf_in_range(const struct nf_conntrack_tuple *t,const struct nf_nat_range2 *r){return (!(r->flags & NF_NAT_RANGE_MAP_IPS)||nf_inet_addr_cmp(&t->src.u3,&r->min_addr))&&(!(r->flags & NF_NAT_RANGE_PROTO_SPECIFIED)||l4proto_in_range(t,0,&r->min_proto,&r->max_proto));}
+static void find_best_ips_proto(const struct nf_conntrack_zone *z,struct nf_conntrack_tuple *t,const struct nf_nat_range2 *r,const struct nf_conn *ct,enum nf_nat_manip_type m){if(r->flags & NF_NAT_RANGE_MAP_IPS){if(m==NF_NAT_MANIP_SRC)t->src.u3=r->min_addr;else t->dst.u3=r->min_addr;}}
+static unsigned short get_random_u16(void){static _Thread_local uint32_t rng=1;rng=rng*1664525+1013904223;return rng>>16;}
+/* Conntrack tuple checks are mocked. Endpoint allocation, reuse, policy
+ * isolation, locking and cleanup below are extracted from the kernel patch.
+ */
+static bool tuple_busy;
+static bool nf_nat_used_tuple(const struct nf_conntrack_tuple *t,const struct nf_conn *ct){return tuple_busy;}
+static bool nf_nat_used_tuple_new(const struct nf_conntrack_tuple *t,const struct nf_conn *ct){return tuple_busy;}
+static bool nf_nat_used_tuple_harder(const struct nf_conntrack_tuple *t,const struct nf_conn *ct,unsigned a){return false;}
+
+/* @KERNEL_FUNCTIONS@ */
+
+
+static struct nf_conn init_ct(unsigned ip,unsigned sport,unsigned remote,bool full) {
+ struct nf_conn ct={0}; ct.net=&nets[0];ct.tuplehash[0].tuple.src.u3.ip=ip;ct.tuplehash[0].tuple.src.u.all=htons(sport);ct.tuplehash[0].tuple.src.l3num=NFPROTO_IPV4;
+ ct.tuplehash[0].tuple.dst.u3.ip=remote;ct.tuplehash[0].tuple.dst.u.all=htons(9999);ct.tuplehash[0].tuple.dst.protonum=IPPROTO_UDP;
+ nf_ct_invert_tuple(&ct.tuplehash[1].tuple,&ct.tuplehash[0].tuple);return ct;
+}
+static struct nf_nat_range2 range(unsigned lo,unsigned hi,bool full){struct nf_nat_range2 r={.flags=NF_NAT_RANGE_MAP_IPS|NF_NAT_RANGE_PROTO_SPECIFIED|(full?NF_NAT_RANGE_FULLCONE:0)};r.min_addr.ip=r.max_addr.ip=0x12345678;r.min_proto.all=htons(lo);r.max_proto.all=htons(hi);return r;}
+static unsigned port(struct nf_conn *ct){return ntohs(ct->tuplehash[1].tuple.dst.u.all);}
+static void clean(struct nf_conn *ct){if(ct->status & IPS_SRC_NAT_DONE){nf_nat_cleanup_conntrack(ct);ct->status=0;}}
+static void basics(void){
+ struct nf_nat_range2 r=range(40000,40000,true); struct nf_conn a=init_ct(10,5000,100,1),b=init_ct(11,5000,101,1);
+ assert(nf_nat_setup_info(&a,&r,0)==NF_ACCEPT);assert(nf_nat_setup_info(&b,&r,0)==NF_DROP);
+ struct nf_conn reuse=init_ct(10,5000,102,1);r.flags|=NF_NAT_RANGE_PROTO_RANDOM_FULLY;
+ assert(nf_nat_setup_info(&reuse,&r,0)==NF_ACCEPT && port(&reuse)==port(&a));clean(&reuse);
+ struct nf_conn incoming=init_ct(200,9999,0x12345678,0);incoming.tuplehash[0].tuple.dst.u.all=htons(40000);
+ struct nf_conntrack_tuple result; assert(!find_appropriate_dst(a.net,&a.zone,&incoming.tuplehash[0].tuple,&result));
+ a.status|=IPS_CONFIRMED;assert(find_appropriate_dst(a.net,&a.zone,&incoming.tuplehash[0].tuple,&result));assert(result.dst.u3.ip==10 && ntohs(result.dst.u.all)==5000);
+ assert(!find_appropriate_dst(&nets[1],&a.zone,&incoming.tuplehash[0].tuple,&result));
+ struct nf_conntrack_zone other={.reply=1};assert(!find_appropriate_dst(a.net,&other,&incoming.tuplehash[0].tuple,&result));
+ incoming.tuplehash[0].tuple.src.l3num=NFPROTO_IPV6;assert(!find_appropriate_dst(a.net,&a.zone,&incoming.tuplehash[0].tuple,&result));
+ incoming.tuplehash[0].tuple.src.l3num=NFPROTO_IPV4;a.status|=IPS_DYING;assert(!find_appropriate_dst(a.net,&a.zone,&incoming.tuplehash[0].tuple,&result));clean(&a);
+ assert(nf_nat_setup_info(&b,&r,0)==NF_ACCEPT);clean(&b);
+ // Ordinary -> fullcone and fullcone -> ordinary collisions must fail.
+ struct nf_conn ordinary=init_ct(20,6000,201,0);r=range(40000,40000,false);assert(nf_nat_setup_info(&ordinary,&r,0)==NF_ACCEPT);ordinary.status|=IPS_CONFIRMED;
+ assert(!find_appropriate_dst(ordinary.net,&ordinary.zone,&incoming.tuplehash[0].tuple,&result));
+ b=init_ct(21,6000,202,1);r.flags|=NF_NAT_RANGE_FULLCONE;assert(nf_nat_setup_info(&b,&r,0)==NF_DROP);clean(&ordinary);
+ assert(nf_nat_setup_info(&b,&r,0)==NF_ACCEPT);r.flags&=~NF_NAT_RANGE_FULLCONE;ordinary=init_ct(20,6000,203,0);assert(nf_nat_setup_info(&ordinary,&r,0)==NF_DROP);clean(&b);
+ // Ordinary sharing remains possible.
+ assert(nf_nat_setup_info(&ordinary,&r,0)==NF_ACCEPT);b=init_ct(21,6000,204,0);assert(nf_nat_setup_info(&b,&r,0)==NF_ACCEPT);clean(&b);clean(&ordinary);
+ // No explicit range still enforces endpoint uniqueness.
+ r=range(0,0,true);r.flags&=~NF_NAT_RANGE_PROTO_SPECIFIED;a=init_ct(10,5000,100,1);b=init_ct(11,5000,101,1);
+ assert(nf_nat_setup_info(&a,&r,0)==NF_ACCEPT);assert(nf_nat_setup_info(&b,&r,0)==NF_ACCEPT);assert(port(&a)!=port(&b));clean(&a);clean(&b);
+ // Protocol/helper fallback is ordinary NAT.
+ r=range(40000,40000,true);a=init_ct(10,5000,100,1);a.tuplehash[0].tuple.dst.protonum=IPPROTO_GRE;a.tuplehash[1].tuple.dst.protonum=IPPROTO_GRE;
+ assert(nf_nat_setup_info(&a,&r,0)==NF_ACCEPT && !a.nat_fullcone);clean(&a);
+ a=init_ct(10,5000,100,1);a.helper=true;assert(nf_nat_setup_info(&a,&r,0)==NF_ACCEPT && !a.nat_fullcone);clean(&a);
+ puts("PASS: reuse, exhaustion, inbound mapping, confirmation, netns/zone/family isolation, mixed NAT, no-range, helper/protocol fallback, cleanup and reuse");
+}
+#define NTHREAD 8
+#define PERTHREAD 256
+static struct nf_conn flows[NTHREAD][PERTHREAD];static bool accepted[NTHREAD][PERTHREAD];static pthread_barrier_t barrier;
+static bool shared, mixed;
+static void *worker(void *arg){size_t n=(size_t)arg;struct nf_nat_range2 r=range(40000,44095,!mixed || n%2==0);pthread_barrier_wait(&barrier);for(unsigned i=0;i<PERTHREAD;i++){flows[n][i]=init_ct(shared?100:100+n*PERTHREAD+i,5000,10000+n*PERTHREAD+i,1);accepted[n][i]=nf_nat_setup_info(&flows[n][i],&r,0)==NF_ACCEPT;if(accepted[n][i])flows[n][i].status|=IPS_CONFIRMED;}return NULL;}
+static void *cleaner(void *arg){size_t n=(size_t)arg;pthread_barrier_wait(&barrier);for(unsigned i=0;i<PERTHREAD;i++)clean(&flows[n][i]);return NULL;}
+static void threaded(bool share){pthread_t ids[NTHREAD];shared=share;pthread_barrier_init(&barrier,NULL,NTHREAD);for(size_t i=0;i<NTHREAD;i++)assert(!pthread_create(&ids[i],NULL,worker,(void*)i));for(int i=0;i<NTHREAD;i++)pthread_join(ids[i],NULL);
+ unsigned seen[65536]={0},ordinary[65536]={0},count=0,common=0;
+ for(unsigned n=0;n<NTHREAD;n++)for(unsigned i=0;i<PERTHREAD;i++){assert(accepted[n][i]);unsigned p=port(&flows[n][i]);if(share){if(!common)common=p;assert(p==common);}else if (mixed) { if (flows[n][i].nat_fullcone) {assert(!seen[p]++ && !ordinary[p]);} else {assert(!seen[p]);ordinary[p]++;} } else assert(!seen[p]++);count++;}
+ for(size_t i=0;i<NTHREAD;i++)assert(!pthread_create(&ids[i],NULL,cleaner,(void*)i));for(int i=0;i<NTHREAD;i++)pthread_join(ids[i],NULL);
+ for(int i=0;i<256;i++){assert(!atomic_load(&nf_nat_bysource[i].first));assert(!atomic_load(&nf_nat_by_manip_src[i].first));}
+ pthread_barrier_destroy(&barrier);printf("PASS: 8 threads, %u flows, %s, concurrent bucket cleanup\n",count,share?"same endpoint reuse":mixed?"mixed ordinary/fullcone reservations":"distinct endpoint reservations");}
+
+static void extended(void) {
+ unsigned count=0;
+ unsigned families[]={NFPROTO_IPV4,NFPROTO_IPV6};
+ unsigned protocols[]={IPPROTO_TCP,IPPROTO_UDP,IPPROTO_UDPLITE,IPPROTO_SCTP};
+ unsigned ports[]={1,1024,65535};
+ for(unsigned f=0;f<2;f++) for(unsigned p=0;p<4;p++) for(unsigned q=0;q<3;q++) {
+  struct nf_nat_range2 r=range(ports[q],ports[q],true);
+  struct nf_conn a=init_ct(10,5000,100,1), b=init_ct(10,5000,101,1);
+  a.tuplehash[0].tuple.src.l3num=b.tuplehash[0].tuple.src.l3num=families[f];
+  a.tuplehash[0].tuple.dst.protonum=b.tuplehash[0].tuple.dst.protonum=protocols[p];
+  nf_ct_invert_tuple(&a.tuplehash[1].tuple,&a.tuplehash[0].tuple);
+  nf_ct_invert_tuple(&b.tuplehash[1].tuple,&b.tuplehash[0].tuple);
+  assert(nf_nat_setup_info(&a,&r,NF_NAT_MANIP_SRC)==NF_ACCEPT);
+  tuple_busy=true;
+  assert(nf_nat_setup_info(&b,&r,NF_NAT_MANIP_SRC)==NF_DROP);
+  assert(!nf_nat_initialized(&b,NF_NAT_MANIP_SRC));
+  tuple_busy=false;
+  assert(nf_nat_setup_info(&b,&r,NF_NAT_MANIP_SRC)==NF_ACCEPT && port(&a)==port(&b));
+  a.status|=IPS_CONFIRMED;
+  struct nf_conn inbound=init_ct(200,9000,0x12345678,0);
+  inbound.tuplehash[0].tuple.src.l3num=families[f];
+  inbound.tuplehash[0].tuple.dst.protonum=protocols[p];
+  inbound.tuplehash[0].tuple.dst.u.all=htons(ports[q]);
+  nf_ct_invert_tuple(&inbound.tuplehash[1].tuple,&inbound.tuplehash[0].tuple);
+  struct nf_nat_range2 d={.flags=NF_NAT_RANGE_FULLCONE};
+  assert(nf_nat_setup_info(&inbound,&d,NF_NAT_MANIP_DST)==NF_ACCEPT);
+  assert(inbound.status&IPS_DST_NAT);
+  assert(inbound.tuplehash[1].tuple.src.u3.ip==10);
+  assert(ntohs(inbound.tuplehash[1].tuple.src.u.all)==5000);
+  clean(&a); clean(&b);
+  struct nf_conntrack_tuple dst;
+  assert(!find_appropriate_dst(inbound.net,&inbound.zone,&inbound.tuplehash[0].tuple,&dst));
+  assert(inbound.tuplehash[1].tuple.src.u3.ip==10);
+  count++;
+ }
+ // Separate WAN addresses may use the same port for different clients.
+ struct nf_nat_range2 r=range(40000,40000,true);
+ struct nf_conn a=init_ct(10,5000,100,1), b=init_ct(11,5000,101,1);
+ assert(nf_nat_setup_info(&a,&r,0)==NF_ACCEPT);
+ r.min_addr.ip=r.max_addr.ip=0x12345679;
+ assert(nf_nat_setup_info(&b,&r,0)==NF_ACCEPT && port(&a)==port(&b));
+ clean(&a);clean(&b);
+ printf("PASS %u family/protocol/port-boundary cases: tuple collision rejection, reuse, DNAT and mapping expiration; multi-WAN addresses isolated\n",count);
+}
+
+
+/* Pause after the final zone check. Retirement must encounter the bucket
+ * lock before the lookup copies/uses this conntrack's fields. These are host
+ * scheduling models, not Linux slab, RCU or lockdep runtime tests.
+ */
+static struct nf_conn *recycle_target;
+static bool recycle_armed;
+static pthread_t retire_thread;
+static void *recycle_binding(void *unused) {
+ retiring = true;
+ clean(recycle_target);
+ *recycle_target = init_ct(999, 9000, 888, false);
+ recycle_target->net = &nets[1];
+ return NULL;
+}
+static void pause_for_recycle(const struct nf_conn *ct) {
+ if (!recycle_armed || ct != recycle_target) return;
+ recycle_armed = false;
+ assert(!pthread_create(&retire_thread, NULL, recycle_binding, NULL));
+ while (!atomic_load(&retire_attempted)) sched_yield();
+}
+static void lifecycle(void) {
+ for (unsigned i=0; i<300; i++) {
+  struct nf_conn binding=init_ct(10,5000,100,true);
+  struct nf_nat_range2 r=range(40000,40000,true);
+  assert(nf_nat_setup_info(&binding,&r,NF_NAT_MANIP_SRC)==NF_ACCEPT);
+  binding.status|=IPS_CONFIRMED;
+  struct nf_conntrack_tuple incoming=binding.tuplehash[1].tuple,result={0};
+  struct nf_conntrack_zone zone=binding.zone;
+  struct nf_conn candidate=init_ct(10,5000,101,true);
+  candidate.nat_fullcone=true;
+  unsigned h;
+  if (i%3==1) {
+   h=hash_by_src(binding.net,&zone,&binding.tuplehash[0].tuple);
+   expected_lock=&nf_nat_locks[h%CONNTRACK_LOCKS];
+  } else {
+   nf_ct_invert_tuple(&result,&incoming);
+   h=hash_by_src(binding.net,&zone,&result);
+   expected_lock=&nf_nat_manip_src_locks[h%CONNTRACK_LOCKS];
+  }
+  atomic_store(&retire_attempted,false);recycle_target=&binding;recycle_armed=true;
+  if (i%3==0) {
+   assert(find_appropriate_dst(&nets[0],&zone,&incoming,&result));
+   assert(result.dst.u3.ip==10 && ntohs(result.dst.u.all)==5000);
+  } else if (i%3==1) {
+   assert(find_appropriate_src(&nets[0],&zone,&candidate.tuplehash[0].tuple,&result,&r));
+   assert(result.src.u3.ip==0x12345678 && ntohs(result.src.u.all)==40000);
+  } else {
+   assert(!nf_nat_used_3_tuple(&result,&candidate));
+  }
+  assert(!pthread_join(retire_thread,NULL));
+  assert(binding.tuplehash[0].tuple.src.u3.ip==999);
+  assert(atomic_load(&retire_attempted));
+ }
+ puts("PASS 300 concurrent retirement/reuse interleavings across inbound, source reuse and reservation lookups");
+}
+int main(void){for(int i=0;i<CONNTRACK_LOCKS;i++){pthread_mutex_init(&nf_nat_locks[i],NULL);pthread_mutex_init(&nf_nat_fullcone_locks[i],NULL);pthread_mutex_init(&nf_nat_manip_src_locks[i],NULL);}basics();extended();lifecycle();for(int i=0;i<10;i++){mixed=false;threaded(false);threaded(true);mixed=true;threaded(false);}return 0;}
