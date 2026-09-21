@@ -162,23 +162,16 @@ router packet tests, Linux RCU/lockdep testing, or MTK/QCA/QCB PPE tests.
 
 ## Regression checks
 
-The tests extract the current prepared kernel/firewall functions and use host
-fixtures for connection tracking, kernel feature probes and network state.
-They do not contact a router. Run from the repository root, with the prepared
-source directories and an output directory outside the source tree:
+The source-extraction, firewall-rule, LuCI staging and migration test tools are
+kept in the external validation archive rather than shipped in this package.
+They use prepared kernel/firewall sources and isolated host fixtures; they do
+not contact a router. The recorded checks cover endpoint isolation, bounded
+allocation, mixed NAT policies, concurrent retirement/reuse, compilation
+without fullcone state, all supported protocols, address restrictions, DNAT
+precedence, unavailable-kernel fallback, IPv4 masquerading coupling, IPv6
+independence and idempotent migration.
 
-```sh
-python3 package/network/utils/fullconenat-sonic/tests/run-core.py "$kernel_source" "$test_output/core"
-python3 package/network/utils/fullconenat-sonic/tests/firewall4.py . "$firewall4_source" "$test_output/fw4"
-python3 package/network/utils/fullconenat-sonic/tests/firewall3.py . "$firewall3_source" "$uci_source" "$test_output/fw3"
-node package/emortal/luci-app-fullconenat-sonic/tests/masquerading.cjs .
-python3 package/emortal/luci-app-fullconenat-sonic/tests/migration.py . "$host_uci" "$test_output/migration"
-```
-
-Core tests cover endpoint isolation, bounded allocation, mixed NAT policies,
-concurrent retirement/reuse and compilation without fullcone state. The rule
-checks cover all supported protocols, address restrictions, DNAT precedence
-and unavailable-kernel fallback. UI checks use the real LuCI UCI staging layer;
-install checks use the real host UCI binary with isolated configuration files.
 Compile the affected target modules with the kernel option both on and off,
-and rebuild the firmware before deploying kernel changes.
+and rebuild the firmware before deploying kernel changes. The validation
+archive contains the exact tool copies, source hashes and run logs for each
+release check.
