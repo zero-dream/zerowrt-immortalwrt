@@ -1,10 +1,14 @@
+From: ViKing <viking.yfy@qq.com>
+Date: Sat, 26 Sep 2026 03:10:00 +0800
 Subject: [PATCH] net: dsa: add service tags for external RTL9303 switches
 
-The external CPU on the CR1000A connects to port 27, rather than the
-internal CPU port 28. Use isolated service VLANs to transport port
-identity. Unlike tag_8021q, retain five port bits for ports 20 and 24.
+An external CPU can connect to an RTL9303 front-panel MAC instead of the
+internal CPU port. Use isolated service VLANs to transport port identity.
+Unlike tag_8021q, retain five port bits for all supported external ports.
 Customer tags remain inside the service tag. Separate TX VLANs avoid
 replicating directed packets when the RX VLAN offloads a bridge.
+
+Signed-off-by: ViKing <viking.yfy@qq.com>
 
 --- a/include/net/dsa.h
 +++ b/include/net/dsa.h
