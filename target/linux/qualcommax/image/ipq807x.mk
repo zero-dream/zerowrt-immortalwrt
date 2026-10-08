@@ -758,7 +758,7 @@ define Device/verizon_cr1000a
 	DEVICE_MODEL := CR1000A
 	SOC := ipq8072
 	DEVICE_DTS_CONFIG := config@verizon_cr1000a
-	DEVICE_PACKAGES := ipq-wifi-verizon_cr1000a ath11k-firmware-qcn9074 \
+	DEVICE_PACKAGES := ipq-wifi-verizon_cr1000a ath11k-firmware-qcn9074-ddwrt \
 		kmod-dsa-rtl9303-spi cr1000a-recovery
 endef
 TARGET_DEVICES += verizon_cr1000a
