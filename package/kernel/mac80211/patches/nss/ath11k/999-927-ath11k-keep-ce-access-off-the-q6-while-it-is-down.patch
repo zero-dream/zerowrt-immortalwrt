@@ -1,0 +1,49 @@
+From: Julius Bairaktaris <julius@bairaktaris.de>
+Subject: [PATCH] ath11k: keep copy engine access off the Q6 while it is down
+
+On the AHB bus (IPQ8074) the WLAN copy engine register space is only
+accessible while the Q6 subsystem is powered; a read while TrustZone is
+tearing the subsystem down or bringing it back up raises a synchronous
+external abort in interrupt context and takes the whole SoC down.
+Observed on IPQ8074 during firmware recovery:
+
+  ath11k_ahb_ce_interrupt_handler
+    ath11k_ahb_ce_irq_disable        <- CE register read
+  (__scm_smc_call for the wcss stop concurrent on another CPU)
+
+The upstream CE IRQ operations now quiesce copy engines during reset.
+Keep the additional remoteproc state guard for asynchronous firmware
+crashes: remoteproc can stop the Q6 while CE handlers and tasklets are
+still pending. Skip access until the remote processor is running again.
+The interrupts are edge triggered and recovery reprograms the rings.
+
+Signed-off-by: Julius Bairaktaris <julius@bairaktaris.de>
+--- a/drivers/net/wireless/ath/ath11k/ahb.c
++++ b/drivers/net/wireless/ath/ath11k/ahb.c
+@@ -484,6 +484,10 @@ static void ath11k_ahb_free_irq(struct a
+ static void ath11k_ahb_ce_tasklet(struct tasklet_struct *t)
+ {
+ 	struct ath11k_ce_pipe *ce_pipe = from_tasklet(ce_pipe, t, intr_tq);
++	struct ath11k_ahb *ab_ahb = ath11k_ahb_priv(ce_pipe->ab);
++
++	if (ab_ahb->tgt_rproc->state != RPROC_RUNNING)
++		return;
+ 
+ 	ath11k_ce_per_engine_service(ce_pipe->ab, ce_pipe->pipe_num);
+ 
+@@ -493,6 +497,15 @@ static void ath11k_ahb_ce_tasklet(struct
+ static irqreturn_t ath11k_ahb_ce_interrupt_handler(int irq, void *arg)
+ {
+ 	struct ath11k_ce_pipe *ce_pipe = arg;
++	struct ath11k_ahb *ab_ahb = ath11k_ahb_priv(ce_pipe->ab);
++
++	/* While the Q6 is stopped or booting, the WLAN CE register space
++	 * is not accessible; a read raises a synchronous external abort.
++	 * The remoteproc core marks the state before it starts the
++	 * TrustZone teardown, so skip the (edge triggered) interrupt.
++	 */
++	if (ab_ahb->tgt_rproc->state != RPROC_RUNNING)
++		return IRQ_HANDLED;
+ 
+ 	/* last interrupt received for this CE */
+ 	ce_pipe->timestamp = jiffies;

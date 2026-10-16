@@ -1,0 +1,515 @@
+DTS_DIR := $(DTS_DIR)/qcom
+DEVICE_VARS += TPLINK_SUPPORT_STRING
+
+define Build/wax610-netgear-tar
+	mkdir $@.tmp
+	mv $@ $@.tmp/nand-ipq6018-apps.img
+	md5sum $@.tmp/nand-ipq6018-apps.img | cut -c 1-32 > $@.tmp/nand-ipq6018-apps.md5sum
+	echo "WAX610" > $@.tmp/metadata.txt
+	echo "WAX610-610Y_V99.9.9.9" > $@.tmp/version
+	$(TAR) -C $@.tmp/ -cf $@ --sort=name --numeric-owner --owner=0 --group=0 --mode=go-w \
+		$(if $(SOURCE_DATE_EPOCH),--mtime="@$(SOURCE_DATE_EPOCH)") .
+	rm -rf $@.tmp
+endef
+
+define Build/netgear-rbx350-qsdk-ipq-factory
+	$(CP) $(FLASH_SCRIPT) $(KDIR_TMP)/
+
+	echo "VERSION : V5.0.0.0_$(LINUX_VERSION)" > $@.metadata
+	echo "MODEL_ID : $(DEVICE_MODEL)" >> $@.metadata
+
+	$(TOPDIR)/scripts/mkits-qsdk-ipq-image.sh $@.its $(FLASH_SCRIPT) txt $@.metadata ubi $@
+	PATH=$(LINUX_DIR)/scripts/dtc:$(PATH) mkimage -f $@.its $@.new
+	@mv $@.new $@
+endef
+
+# RouterBOOT only loads bare ARM64 ELF images, not FIT, and the yaffs kernel
+# partition is just 8 MiB while the raw kernel is around 14 MiB. The kernel is
+# therefore wrapped in a self-extracting LZMA loader; see
+# image/mikrotik-lzma-loader.
+define Build/mikrotik-lzma-loader
+	# Compress $@ (the file currently travelling through the pipe) rather than
+	# $(IMAGE_KERNEL): the latter picks the wrong, larger image on squashfs
+	# builds. Write via a temporary file because $@ is both source and target.
+	$(MAKE) -C $(TOPDIR)/target/linux/qualcommax/image/mikrotik-lzma-loader \
+		KERNEL_IMAGE="$@" \
+		DTB="$(KERNEL_BUILD_DIR)/image-$(DEVICE_DTS).dtb" \
+		OUTPUT="$@.loader" \
+		BUILD="$@.build" \
+		TARGET_CC="$(TARGET_CC)" \
+		STAGING_DIR_HOST="$(STAGING_DIR_HOST)"
+	mv "$@.loader" "$@"
+	rm -rf "$@.build"
+endef
+
+define Device/8devices_mango-dvk
+	$(call Device/FitImageLzma)
+	DEVICE_VENDOR := 8devices
+	DEVICE_MODEL := Mango-DVK
+	IMAGE_SIZE := 27776k
+	BLOCKSIZE := 64k
+	SOC := ipq6010
+	SUPPORTED_DEVICES += 8devices,mango
+	IMAGE/sysupgrade.bin := append-kernel | pad-to 64k | append-rootfs | pad-rootfs | check-size | append-metadata
+	DEVICE_PACKAGES := ipq-wifi-8devices_mango
+endef
+TARGET_DEVICES += 8devices_mango-dvk
+
+define Device/alfa-network_ap120c-ax
+	$(call Device/FitImage)
+	$(call Device/UbiFit)
+	DEVICE_VENDOR := ALFA Network
+	DEVICE_MODEL := AP120C-AX
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	SOC := ipq6000
+	DEVICE_PACKAGES := ipq-wifi-alfa-network_ap120c-ax
+endef
+TARGET_DEVICES += alfa-network_ap120c-ax
+
+define Device/cambiumnetworks_xe3-4
+	$(call Device/FitImage)
+	$(call Device/UbiFit)
+	DEVICE_VENDOR := Cambium Networks
+	DEVICE_MODEL := XE3-4
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	DEVICE_DTS_CONFIG := config@cp01-c3-xv3-4
+	SOC := ipq6010
+	DEVICE_PACKAGES := ipq-wifi-cambiumnetworks_xe34 ath11k-firmware-qcn9074-ddwrt
+endef
+TARGET_DEVICES += cambiumnetworks_xe3-4
+
+define Device/glinet_gl-common
+	$(call Device/FitImage)
+	$(call Device/UbiFit)
+	DEVICE_VENDOR := GL.iNet
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	SOC := ipq6000
+	DEVICE_DTS_CONFIG := config@cp03-c1
+endef
+
+define Device/glinet_gl-ax1800
+	$(call Device/glinet_gl-common)
+	DEVICE_MODEL := GL-AX1800
+	DEVICE_PACKAGES := ipq-wifi-glinet_gl-ax1800
+	SUPPORTED_DEVICES += glinet,ax1800
+endef
+TARGET_DEVICES += glinet_gl-ax1800
+
+define Device/glinet_gl-axt1800
+	$(call Device/glinet_gl-common)
+	DEVICE_MODEL := GL-AXT1800
+	DEVICE_PACKAGES := ipq-wifi-glinet_gl-axt1800 kmod-hwmon-pwmfan
+	SUPPORTED_DEVICES += glinet,axt1800
+endef
+TARGET_DEVICES += glinet_gl-axt1800
+
+define Device/jdcloud_re-cs-02
+	$(call Device/FitImage)
+	$(call Device/EmmcImage)
+	DEVICE_VENDOR := JDCloud
+	DEVICE_MODEL := RE-CS-02
+	KERNEL_SIZE := 6144k
+	SOC := ipq6010
+	DEVICE_DTS_CONFIG := config@cp03-c3
+	DEVICE_PACKAGES := ipq-wifi-jdcloud_re-cs-02 ath11k-firmware-qcn9074-ddwrt luci-app-athena-led luci-i18n-athena-led-zh-cn
+	IMAGE/factory.bin := append-kernel | pad-to $$(KERNEL_SIZE) | append-rootfs | append-metadata
+endef
+TARGET_DEVICES += jdcloud_re-cs-02
+
+define Device/jdcloud_re-cs-07
+	$(call Device/FitImage)
+	$(call Device/EmmcImage)
+	DEVICE_VENDOR := JDCloud
+	DEVICE_MODEL := RE-CS-07
+	KERNEL_SIZE := 6144k
+	SOC := ipq6010
+	DEVICE_DTS_CONFIG := config@cp03-c4
+	DEVICE_PACKAGES := -kmod-ath -kmod-ath11k -kmod-ath11k-ahb -kmod-ath11k-pci \
+		-ath11k-firmware-ipq6018 -ath11k-firmware-ipq6018-ddwrt -ath11k-firmware-qcn9074 -ath11k-firmware-qcn9074-ddwrt
+	IMAGE/factory.bin := append-kernel | pad-to $$(KERNEL_SIZE) | append-rootfs | append-metadata
+endef
+TARGET_DEVICES += jdcloud_re-cs-07
+
+define Device/jdcloud_re-ss-01
+	$(call Device/FitImage)
+	$(call Device/EmmcImage)
+	DEVICE_VENDOR := JDCloud
+	DEVICE_MODEL := RE-SS-01
+	KERNEL_SIZE := 6144k
+	SOC := ipq6000
+	DEVICE_DTS_CONFIG := config@cp03-c2
+	DEVICE_PACKAGES := ipq-wifi-jdcloud_re-ss-01
+	IMAGE/factory.bin := append-kernel | pad-to $$(KERNEL_SIZE) | append-rootfs | append-metadata
+endef
+TARGET_DEVICES += jdcloud_re-ss-01
+
+define Device/link_nn6000-common
+	$(call Device/FitImage)
+	$(call Device/EmmcImage)
+	DEVICE_VENDOR := Link
+	SOC := ipq6000
+	KERNEL_SIZE := 6144k
+	DEVICE_DTS_CONFIG := config@cp03-c1
+	DEVICE_PACKAGES := ipq-wifi-link_nn6000
+	IMAGE/factory.bin := append-kernel | pad-to $$(KERNEL_SIZE) | append-rootfs | append-metadata
+endef
+
+define Device/link_nn6000-v1
+	$(Device/link_nn6000-common)
+	DEVICE_MODEL := NN6000 v1
+	DEVICE_VARIANT := v1
+endef
+TARGET_DEVICES += link_nn6000-v1
+
+define Device/link_nn6000-v2
+	$(Device/link_nn6000-common)
+	DEVICE_MODEL := NN6000 v2
+	DEVICE_VARIANT := v2
+endef
+TARGET_DEVICES += link_nn6000-v2
+
+define Device/linksys_mr
+	$(call Device/FitImage)
+	DEVICE_VENDOR := Linksys
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	KERNEL_SIZE := 8192k
+	IMAGES += factory.bin
+	IMAGE/factory.bin := append-kernel | pad-to $$$$(KERNEL_SIZE) | append-ubi | linksys-image type=$$$$(DEVICE_MODEL)
+	DEVICE_PACKAGES := kmod-usb-ledtrig-usbport
+endef
+
+define Device/linksys_mr7350
+	$(call Device/linksys_mr)
+	DEVICE_MODEL := MR7350
+	SOC := ipq6000
+	NAND_SIZE := 256m
+	IMAGE_SIZE := 75776k
+	DEVICE_PACKAGES += ipq-wifi-linksys_mr7350 kmod-leds-pca963x
+endef
+TARGET_DEVICES += linksys_mr7350
+
+define Device/linksys_mr7500
+	$(call Device/linksys_mr)
+	DEVICE_MODEL := MR7500
+	SOC := ipq6018
+	NAND_SIZE := 512m
+	IMAGE_SIZE := 147456k
+	DEVICE_PACKAGES += ipq-wifi-linksys_mr7500 ath11k-firmware-qcn9074-ddwrt
+endef
+TARGET_DEVICES += linksys_mr7500
+
+define Device/mikrotik_chateau-5g-r17-ax
+	$(call Device/UbiFit)
+	KERNEL := kernel-bin | mikrotik-lzma-loader
+	KERNEL_INITRAMFS := kernel-bin | mikrotik-lzma-loader
+	DEVICE_VENDOR := MikroTik
+	DEVICE_MODEL := S53UG+5HaxD2HaxD&RG650E-EU (Chateau 5G R17 ax)
+	SOC := ipq6010
+	DEVICE_DTS := ipq6010-mikrotik-chateau-5g-r17
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	# yafut: required by sysupgrade. The kernel partition is yaffs, whose
+	#   metadata and ECC live in the OOB area, so "mtd write" cannot be used.
+	# The built-in Quectel RG650E-EU (2c7c:0122) speaks QMI/RMNET. Note that
+	#   uqmi alone does not fully drive it: it only gets a client ID for UIM,
+	#   while DMS/NAS/WDS answer "Failed to connect to service". qmicli from
+	#   libqmi reaches all of them, so a libqmi based connection manager is
+	#   needed for an actual data session.
+	# kmod-usb-serial-option: AT ports of the modem.
+	# No ipq-wifi package: this unit's own board data and cal data come out
+	#   of RouterBOOT hard_config at runtime, served to ath11k from the
+	#   firmware hotplug script ipq60xx/base-files/etc/hotplug.d/firmware/
+	#   11-ath11k-caldata. The board-2.bin from ath11k-firmware-ipq6018 has
+	#   no entry this device matches.
+	# The USB basics (kmod-usb3, kmod-usb-dwc3, kmod-usb-dwc3-qcom) are
+	# already DEFAULT_PACKAGES of the target and are not repeated here.
+	DEVICE_PACKAGES := kmod-usb-net-qmi-wwan kmod-usb-serial-option uqmi \
+		yafut
+endef
+TARGET_DEVICES += mikrotik_chateau-5g-r17-ax
+
+define Device/netgear_rbx350
+	$(call Device/FitImage)
+	$(call Device/UbiFit)
+	SOC := ipq6018
+	DEVICE_VENDOR := Netgear
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	DEVICE_PACKAGES := ipq-wifi-netgear_rbk350
+	FLASH_SCRIPT := netgear_rbx350.bootscript
+	IMAGES += factory.img
+	IMAGE/factory.img := append-ubi | netgear-rbx350-qsdk-ipq-factory
+endef
+
+define Device/netgear_rbr350
+	$(call Device/netgear_rbx350)
+	DEVICE_MODEL := RBR350
+endef
+TARGET_DEVICES += netgear_rbr350
+
+define Device/netgear_rbs350
+	$(call Device/netgear_rbx350)
+	DEVICE_MODEL := RBS350
+endef
+TARGET_DEVICES += netgear_rbs350
+
+define Device/netgear_wax214
+	$(call Device/FitImage)
+	$(call Device/UbiFit)
+	DEVICE_VENDOR := Netgear
+	DEVICE_MODEL := WAX214
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	DEVICE_DTS_CONFIG := config@cp03-c1
+	SOC := ipq6010
+	DEVICE_PACKAGES := ipq-wifi-netgear_wax214
+endef
+TARGET_DEVICES += netgear_wax214
+
+define Device/netgear_wax610-common
+	$(call Device/FitImage)
+	DEVICE_VENDOR := Netgear
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	DEVICE_DTS_CONFIG := config@cp03-c1
+	SOC := ipq6010
+	KERNEL_IN_UBI := 1
+	IMAGES += ui-factory.tar
+	IMAGE/ui-factory.tar := append-ubi | qsdk-ipq-factory-nand | pad-to 4096 | wax610-netgear-tar
+endef
+
+define Device/netgear_wax610
+	$(Device/netgear_wax610-common)
+	DEVICE_MODEL := WAX610
+	DEVICE_PACKAGES := ipq-wifi-netgear_wax610
+endef
+TARGET_DEVICES += netgear_wax610
+
+define Device/netgear_wax610y
+	$(Device/netgear_wax610-common)
+	DEVICE_MODEL := WAX610Y
+	DEVICE_PACKAGES := ipq-wifi-netgear_wax610y
+endef
+TARGET_DEVICES += netgear_wax610y
+
+define Device/qihoo_360v6
+	$(call Device/FitImage)
+	$(call Device/UbiFit)
+	DEVICE_VENDOR := Qihoo
+	DEVICE_MODEL := 360V6
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	SOC := ipq6000
+	DEVICE_DTS_CONFIG := config@cp03-c1
+	DEVICE_PACKAGES := ipq-wifi-qihoo_360v6
+endef
+TARGET_DEVICES += qihoo_360v6
+
+define Device/tplink_eap6xx-common
+	$(call Device/FitImage)
+	$(call Device/UbiFit)
+	DEVICE_VENDOR := TP-Link
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	SOC := ipq6018
+	DEVICE_PACKAGES := kmod-phy-realtek
+	IMAGES += web-ui-factory.bin
+	IMAGE/web-ui-factory.bin := append-ubi | tplink-image-2022
+endef
+
+define Device/tplink_eap610-outdoor
+	$(call Device/tplink_eap6xx-common)
+	DEVICE_MODEL := EAP610-Outdoor
+	DEVICE_VARIANT := v1
+	DEVICE_PACKAGES += ipq-wifi-tplink_eap610-outdoor
+	TPLINK_SUPPORT_STRING := SupportList:\r\n \
+		EAP610-Outdoor(TP-Link|UN|AX1800-D):1.0\r\n \
+		EAP610-Outdoor(TP-Link|JP|AX1800-D):1.0\r\n \
+		EAP610-Outdoor(TP-Link|CA|AX1800-D):1.0
+endef
+TARGET_DEVICES += tplink_eap610-outdoor
+
+define Device/tplink_eap623-outdoor-hd-v1
+	$(call Device/tplink_eap6xx-common)
+	DEVICE_MODEL := EAP623-Outdoor HD
+	DEVICE_VARIANT := v1
+	DEVICE_PACKAGES += ipq-wifi-tplink_eap623-outdoor-hd-v1
+	TPLINK_SUPPORT_STRING := SupportList:\r\n \
+		EAP623-Outdoor HD(TP-Link|UN|AX1800-D):1.0
+endef
+TARGET_DEVICES += tplink_eap623-outdoor-hd-v1
+
+define Device/tplink_eap625-outdoor-hd-v1
+	$(call Device/tplink_eap6xx-common)
+	DEVICE_MODEL := EAP625-Outdoor HD
+	DEVICE_VARIANT := v1
+	DEVICE_PACKAGES += ipq-wifi-tplink_eap625-outdoor-hd-v1
+	TPLINK_SUPPORT_STRING := SupportList:\r\n \
+		EAP625-Outdoor HD(TP-Link|UN|AX1800-D):1.0\r\n \
+		EAP625-Outdoor HD(TP-Link|CA|AX1800-D):1.0\r\n \
+		EAP625-Outdoor HD(TP-Link|AU|AX1800-D):1.0\r\n \
+		EAP625-Outdoor HD(TP-Link|KR|AX1800-D):1.0
+endef
+TARGET_DEVICES += tplink_eap625-outdoor-hd-v1
+
+define Device/tplink_eap620-hd-v2
+	$(call Device/FitImage)
+	$(call Device/UbiFit)
+	DEVICE_VENDOR := TP-Link
+	DEVICE_MODEL := EAP620 HD v2
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	SOC := ipq6018
+	DEVICE_PACKAGES := ipq-wifi-tplink_eap620-hd-v2
+	IMAGES += web-ui-factory.bin
+	IMAGE/web-ui-factory.bin := append-ubi | tplink-image-2022
+	TPLINK_SUPPORT_STRING := SupportList:\r\n \
+		EAP620 HD(TP-Link|UN|AX1800-D):2.0\r\n \
+		EAP620 HD(TP-Link|CA|AX1800-D):2.0\r\n \
+		EAP620 HD(TP-Link|JP|AX1800-D):2.0\r\n \
+		EAP620 HD(TP-Link|EG|AX1800-D):2.0\r\n
+endef
+TARGET_DEVICES += tplink_eap620-hd-v2
+
+define Device/tplink_eap620-hd-v3
+	$(call Device/FitImage)
+	$(call Device/UbiFit)
+	DEVICE_VENDOR := TP-Link
+	DEVICE_MODEL := EAP620 HD
+	DEVICE_VARIANT := v3
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	SOC := ipq6018
+	DEVICE_PACKAGES := ipq-wifi-tplink_eap620-hd-v3
+	IMAGES += web-ui-factory.bin
+	IMAGE/web-ui-factory.bin := append-ubi | tplink-image-2022
+	TPLINK_SUPPORT_STRING := SupportList:\r\n \
+		EAP620 HD(TP-Link|UN|AX1800-D):3.0\r\n \
+		EAP620 HD(TP-Link|CA|AX1800-D):3.0\r\n \
+		EAP620 HD(TP-Link|JP|AX1800-D):3.0\r\n \
+		EAP620 HD(TP-Link|EG|AX1800-D):3.0\r\n
+endef
+TARGET_DEVICES += tplink_eap620-hd-v3
+
+define Device/yuncore_fap650
+	$(call Device/FitImage)
+	$(call Device/UbiFit)
+	DEVICE_VENDOR := Yuncore
+	DEVICE_MODEL := FAP650
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	DEVICE_DTS_CONFIG := config@cp03-c1
+	SOC := ipq6018
+	DEVICE_PACKAGES := ipq-wifi-yuncore_fap650
+	IMAGES := factory.ubi factory.ubin sysupgrade.bin
+	IMAGE/factory.ubin := append-ubi | qsdk-ipq-factory-nand
+endef
+TARGET_DEVICES += yuncore_fap650
+
+define Device/nand-common
+	$(call Device/FitImage)
+	$(call Device/UbiFit)
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+endef
+
+define Device/emmc-common
+	$(call Device/FitImage)
+	$(call Device/EmmcImage)
+	KERNEL_SIZE := 6144k
+	IMAGE/factory.bin := append-kernel | pad-to $$(KERNEL_SIZE) | append-rootfs | append-metadata
+endef
+
+define Device/anysafe_e1
+	$(call Device/nand-common)
+	DEVICE_VENDOR := AnySafe
+	DEVICE_MODEL := E1
+	SOC := ipq6010
+	DEVICE_DTS_CONFIG := config@cp01-c3
+	DEVICE_PACKAGES := ipq-wifi-anysafe_e1 ath11k-firmware-qcn9074-ddwrt kmod-hwmon-pwmfan
+endef
+TARGET_DEVICES += anysafe_e1
+
+define Device/cmiot_ax18
+	$(call Device/nand-common)
+	DEVICE_VENDOR := CMIOT
+	DEVICE_MODEL := AX18
+	SOC := ipq6000
+	DEVICE_DTS_CONFIG := config@cp03-c1
+	DEVICE_PACKAGES := ipq-wifi-cmiot_ax18
+endef
+TARGET_DEVICES += cmiot_ax18
+
+define Device/dptech_ap3000-2c
+	$(call Device/nand-common)
+	DEVICE_VENDOR := DPtech
+	DEVICE_MODEL := AP3000-2C
+	SOC := ipq6000
+	DEVICE_DTS_CONFIG := config@cp03-c1-DP019
+	DEVICE_PACKAGES := ipq-wifi-dptech_ap3000-2c
+endef
+TARGET_DEVICES += dptech_ap3000-2c
+
+define Device/redmi_ax5
+	$(call Device/nand-common)
+	DEVICE_VENDOR := Redmi
+	DEVICE_MODEL := AX5
+	SOC := ipq6000
+	DEVICE_DTS_CONFIG := config@cp03-c1
+	DEVICE_PACKAGES := ipq-wifi-redmi_ax5
+endef
+TARGET_DEVICES += redmi_ax5
+
+define Device/xiaomi_ax1800
+	$(call Device/nand-common)
+	DEVICE_VENDOR := Xiaomi
+	DEVICE_MODEL := AX1800
+	SOC := ipq6000
+	DEVICE_DTS_CONFIG := config@cp03-c1
+	DEVICE_PACKAGES := ipq-wifi-xiaomi_ax1800
+endef
+TARGET_DEVICES += xiaomi_ax1800
+
+define Device/zn_m2
+	$(call Device/nand-common)
+	DEVICE_VENDOR := ZN
+	DEVICE_MODEL := M2
+	SOC := ipq6000
+	DEVICE_DTS_CONFIG := config@cp03-c1
+	DEVICE_PACKAGES := ipq-wifi-zn_m2
+endef
+TARGET_DEVICES += zn_m2
+
+define Device/philips_ly1800
+	$(call Device/emmc-common)
+	DEVICE_VENDOR := Philips
+	DEVICE_MODEL := LY1800
+	SOC := ipq6010
+	DEVICE_DTS_CONFIG := config@cp01-c1
+	DEVICE_PACKAGES := ipq-wifi-philips_ly1800
+endef
+TARGET_DEVICES += philips_ly1800
+
+define Device/redmi_ax5-jdcloud
+	$(call Device/emmc-common)
+	DEVICE_VENDOR := Redmi
+	DEVICE_MODEL := AX5 JDCloud
+	SOC := ipq6000
+	DEVICE_DTS_CONFIG := config@cp03-c1
+	DEVICE_PACKAGES := ipq-wifi-redmi_ax5-jdcloud
+endef
+TARGET_DEVICES += redmi_ax5-jdcloud
+
+define Device/sy_y6010
+	$(call Device/emmc-common)
+	DEVICE_VENDOR := SY
+	DEVICE_MODEL := Y6010
+	SOC := ipq6010
+	DEVICE_DTS_CONFIG := config@cp03-c1
+	DEVICE_PACKAGES := ipq-wifi-sy_y6010
+endef
+TARGET_DEVICES += sy_y6010
