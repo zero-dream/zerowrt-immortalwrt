@@ -1,0 +1,76 @@
+# CI 项目
+name: zerowrt-update
+
+# CI 权限
+permissions: write-all
+
+# CI 计划
+on:
+  # 工作流调用
+  workflow_call:
+    inputs:
+      WRT_BRANCH:
+        required: true
+        type: string
+
+# CI 环境
+env:
+  # GITHUB ENV
+  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+  # WRT ENV
+  WRT_BRANCH: ${{inputs.WRT_BRANCH}}
+
+# CI 任务
+jobs:
+  zerowrt-update:
+    name: zerowrt-update
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+        with:
+          token: ${{secrets.WORKFLOW_TOKEN}}
+          ref: ${{env.WRT_BRANCH}}
+
+      - name: InitWorkflow
+        run: |
+          workflowPath="$(mktemp -d "$RUNNER_TEMP/ZeroDream-Workflow-XXXXXX")"
+          git clone --depth=1 https://github.com/zero-dream/github-action.git "$workflowPath/" || exit 1
+          chmod +x "$workflowPath/zerodream/init/init.sh"
+          bash "$workflowPath/zerodream/init/init.sh"
+          rm -rf "$workflowPath/"
+
+      - name: UpdateRepo
+        run: |
+          # Source
+          source "$ZD_ScriptPath/createPath.sh"
+          source "$ZD_ScriptPath/updateRepo.sh"
+          # CloneRepo
+          updatePath=$(cloneRepo)
+          # CloneImmoRepo
+          immoRepo="VIKINGYFY/immortalwrt"
+          immoRepoPath="$(createTempPath 'Temp_ImmoRepo:dir')"
+          git clone --depth=1 --single-branch --branch "$WRT_BRANCH" https://github.com/$immoRepo.git "$immoRepoPath/"
+          # --------------------------------------------------
+          # CopyPaths
+          copyPaths=('zerodream/' '.github/' '.vscode/')
+          for path in "${copyPaths[@]}"; do
+            rm -rf "$immoRepoPath/$path"
+            mkdir -p "$immoRepoPath/$(dirname "$path")"
+            cp -aT "$updatePath/$path" "$immoRepoPath/$path"
+          done
+          # CopyReadme
+          mv "$immoRepoPath/README.md" "$immoRepoPath/README.md.bak"
+          cp -a "$updatePath/README.md" "$immoRepoPath/"
+          # --------------------------------------------------
+          # HandleGitDir
+          rm -rf "$immoRepoPath/.git/"
+          cp -a "$updatePath/.git/" "$immoRepoPath/"
+          # MergeRepo
+          find "$updatePath/" -mindepth 1 -delete
+          cp -a "$immoRepoPath/." "$updatePath/"
+          # DeleteImmoRepoPath
+          rm -rf "$immoRepoPath/"
+          # PushRepo
+          message=$ZD_DateShangHai
+          pushRepo "$message"
