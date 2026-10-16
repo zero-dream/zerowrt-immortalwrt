@@ -1,9 +1,13 @@
+### ZeroWrt-Repository
 
-<div align="center">
+Scheduled archiving of immortalwrt repository<br />
+计划归档 ImmortalWrt 仓库
 
-  ### ZeroWrt-ImmortalWrt
+### Archive Source (归档来源)
 
-  Scheduled archiving of immortalwrt repository<br />
-  计划归档 ImmortalWrt 仓库
+[VIKINGYFY/immortalwrt](https://github.com/VIKINGYFY/immortalwrt)
 
-</div>
+### Precautions (注意事项)
+
+This repository is for archival purposes only. For copyright and license information, please refer to its original repository.<br />
+本仓库仅用于归档，版权与许可证信息，请查看其原始仓库
