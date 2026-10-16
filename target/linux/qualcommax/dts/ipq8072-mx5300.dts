@@ -1,0 +1,301 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+
+/dts-v1/;
+
+#include "ipq8074.dtsi"
+#include "ipq8074-ess.dtsi"
+#include "ipq8074-nss.dtsi"
+#include "ipq8074-common.dtsi"
+#include "ipq8074-hk-cpu.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	model = "Linksys MX5300";
+	compatible = "linksys,mx5300", "qcom,ipq8074";
+
+	aliases {
+		label-mac-device = &swport2;
+		serial0 = &blsp1_uart5;
+
+		led-boot = &led_system_blue;
+		led-running = &led_system_blue;
+		led-failsafe = &led_system_red;
+		led-upgrade = &led_system_green;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+		bootargs-append = " root=/dev/ubiblock0_0";
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		reset-button {
+			label = "reset";
+			gpios = <&tlmm 67 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+
+		wps-button {
+			label = "wps";
+			gpios = <&tlmm 54 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_WPS_BUTTON>;
+		};
+	};
+};
+
+&qpic_nand {
+	status = "okay";
+
+	/*
+	 * Bootloader will find the NAND DT node by the compatible and
+	 * then "fixup" it by adding the partitions from the SMEM table
+	 * using the legacy bindings thus making it impossible for us
+	 * to change the partition table or utilize NVMEM for calibration.
+	 * So add a dummy partitions node that bootloader will populate
+	 * and set it as disabled so the kernel ignores it instead of
+	 * printing warnings due to the broken way bootloader adds the
+	 * partitions.
+	 */
+	partitions {
+		status = "disabled";
+	};
+
+	nand@0 {
+		reg = <0>;
+
+		nand-ecc-strength = <4>;
+		nand-ecc-step-size = <512>;
+		nand-bus-width = <8>;
+
+		partitions {
+			compatible = "qcom,smem-part";
+
+			partition-0-art {
+				label = "0:art";
+				read-only;
+
+				nvmem-layout {
+					compatible = "fixed-layout";
+					#address-cells = <1>;
+					#size-cells = <1>;
+
+					caldata_qca9984: caldata@33000 {
+						reg = <0x33000 0x2f20>;
+					};
+				};
+			};
+
+			partition-devinfo {
+				label = "devinfo";
+				read-only;
+
+				nvmem-layout {
+					compatible = "ascii-eq-delim-env";
+
+					hw_mac_addr: hw_mac_addr {
+						compatible = "mac-base";
+						#nvmem-cell-cells = <1>;
+					};
+				};
+			};
+		};
+	};
+};
+
+&blsp1_i2c2 {
+	status = "okay";
+
+	led-controller@62 {
+		compatible = "nxp,pca9633";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x62>;
+		nxp,hw-blink;
+
+		led_system_red: led@0 {
+			reg = <0>;
+			color = <LED_COLOR_ID_RED>;
+			function = LED_FUNCTION_STATUS;
+		};
+
+		led_system_green: led@1 {
+			reg = <1>;
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_STATUS;
+		};
+
+		led_system_blue: led@2 {
+			reg = <2>;
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_STATUS;
+		};
+	};
+
+	rtc@68 {
+		compatible = "dallas,ds1307";
+		reg = <0x68>;
+	};
+};
+
+/*
+ * QCA4024 is not currently supported, keep for documentation purposes
+ *&blsp1_spi4 {
+ *	status = "okay";
+ *
+ *	pinctrl-0 = <&spi_3_pins &quartz_pins>;
+ *	pinctrl-names = "default";
+ *
+ *	iot@3 {
+ *		compatible = "qca,qca4024";
+ *		reg = <0>;
+ *		spi-max-frequency = <24000000>;
+ *	};
+ *};
+ */
+
+&mdio {
+	status = "okay";
+	pinctrl-0 = <&mdio_pins>;
+	pinctrl-names = "default";
+	reset-gpios = <&tlmm 37 GPIO_ACTIVE_LOW>;
+
+	ethernet-phy-package@0 {
+		compatible = "qcom,qca8075-package";
+		qcom,package-mode = "psgmii";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0>;
+
+		qca8075_0: ethernet-phy@0 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <0>;
+		};
+
+		qca8075_1: ethernet-phy@1 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <1>;
+		};
+
+		qca8075_2: ethernet-phy@2 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <2>;
+		};
+
+		qca8075_3: ethernet-phy@3 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <3>;
+		};
+
+		qca8075_4: ethernet-phy@4 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <4>;
+		};
+	};
+};
+
+&uniphy0 {
+	status = "okay";
+};
+
+&switch {
+	status = "okay";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+			ethernet = <&edma>;
+			phy-mode = "internal";
+
+			fixed-link {
+				speed = <1000>;
+				full-duplex;
+			};
+		};
+
+		swport1: port@1 {
+			reg = <1>;
+			label = "lan1";
+			phy-handle = <&qca8075_0>;
+			phy-mode = "psgmii";
+			pcs-handle = <&uniphy0 0>;
+			nvmem-cells = <&hw_mac_addr 0>;
+			nvmem-cell-names = "mac-address";
+		};
+
+		swport2: port@2 {
+			reg = <2>;
+			label = "lan2";
+			phy-handle = <&qca8075_1>;
+			phy-mode = "psgmii";
+			pcs-handle = <&uniphy0 1>;
+			nvmem-cells = <&hw_mac_addr 0>;
+			nvmem-cell-names = "mac-address";
+		};
+
+		swport3: port@3 {
+			reg = <3>;
+			label = "lan3";
+			phy-handle = <&qca8075_2>;
+			phy-mode = "psgmii";
+			pcs-handle = <&uniphy0 2>;
+			nvmem-cells = <&hw_mac_addr 0>;
+			nvmem-cell-names = "mac-address";
+		};
+
+		swport4: port@4 {
+			reg = <4>;
+			label = "lan4";
+			phy-handle = <&qca8075_3>;
+			phy-mode = "psgmii";
+			pcs-handle = <&uniphy0 3>;
+			nvmem-cells = <&hw_mac_addr 0>;
+			nvmem-cell-names = "mac-address";
+		};
+
+		swport5: port@5 {
+			reg = <5>;
+			label = "wan";
+			phy-handle = <&qca8075_4>;
+			phy-mode = "psgmii";
+			pcs-handle = <&uniphy0 4>;
+			nvmem-cells = <&hw_mac_addr 0>;
+			nvmem-cell-names = "mac-address";
+		};
+	};
+};
+
+&edma {
+	status = "okay";
+};
+
+&pcie1 {
+	status = "okay";
+	perst-gpios = <&tlmm 58 GPIO_ACTIVE_LOW>;
+
+	pcie@0 {
+		wifi@0,0 {
+			status = "okay";
+			compatible = "qcom,ath10k";
+			qcom,ath10k-fw-memory-mode = <1>;
+			qcom,ath10k-calibration-variant = "Linksys-MX5300";
+			reg = <0x00010000 0 0 0 0>;
+
+			nvmem-cell-names = "pre-calibration";
+			nvmem-cells = <&caldata_qca9984>;
+		};
+	};
+};
+
+&wifi {
+	status = "okay";
+	qcom,ath11k-fw-memory-mode = <1>;
+	qcom,ath11k-calibration-variant = "Linksys-MX5300";
+};

@@ -1,0 +1,435 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+
+/dts-v1/;
+
+#include "ipq8074.dtsi"
+#include "ipq8074-ess.dtsi"
+#include "ipq8074-nss.dtsi"
+#include "ipq8074-common.dtsi"
+#include "ipq8074-hk-cpu.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	model = "Verizon CR1000A";
+	compatible = "verizon,cr1000a", "qcom,ipq8074";
+
+	aliases {
+		label-mac-device = &swport5;
+		serial0 = &blsp1_uart5;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		reset {
+			debounce-interval = <0x3c>;
+			gpios = <&tlmm 0x2c GPIO_ACTIVE_LOW>;
+			label = "reset";
+			linux,code = <KEY_RESTART>;
+		};
+
+		wps {
+			debounce-interval = <0x3c>;
+			gpios = <&tlmm 0x2a GPIO_ACTIVE_LOW>;
+			label = "wps";
+			linux,code = <KEY_WPS_BUTTON>;
+		};
+	};
+};
+
+&soc {
+	fan5646_vreg: fan5646-vreg {
+		compatible = "regulator-fixed";
+		regulator-name = "fan5646_vreg";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+	};
+
+	fan5646 {
+		status = "okay";
+		compatible = "fsi,leds-fan5646";
+		linux-name = "white";
+		rgb-name = "rgb";
+		gpios = <&tlmm 0x1d 0x2>; /* COMM GPIO, GPIOF_DIR_OUT | GPIOF_INIT_HIGH */
+		full-current = <0>; /* Default current 5 mA */
+		tsleep = <7>;
+		fan5646-supply = <&fan5646_vreg>; /* phandle of our regulator node */
+	};
+};
+
+&blsp1_i2c3 {
+	status = "okay";
+	pinctrl-0 = <&i2c_2_pins>;
+	pinctrl-names = "default";
+};
+
+&blsp1_spi1 {
+	/* The OEM DTS probes this slot, but the board returns no JEDEC ID. */
+	status = "disabled";
+
+	flash@0 {
+		compatible = "micron,n25q128a11", "jedec,spi-nor";
+		linux,modalias = "m25p80", "mx30uf2g18ac", "n25q128a11";
+		spi-max-frequency = <50000000>;
+		reg = <0>;
+	};
+};
+
+&blsp1_spi5 {
+	status = "okay";
+
+	pinctrl-0 = <&spi_4_pins>;
+	pinctrl-names = "default";
+
+	rtl9303: switch@0 {
+		compatible = "realtek,rtl9303-spi";
+		reg = <0>;
+		spi-max-frequency = <12000000>;
+		dsa,member = <1 0>;
+
+		mdio-controller {
+			compatible = "realtek,rtl9303-spi-mdio";
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			mdio-bus@0 {
+				reg = <0>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				lan2_phy: ethernet-phy@7 {
+					reg = <7>;
+
+					leds {
+						#address-cells = <1>;
+						#size-cells = <0>;
+
+						led@0 {
+							reg = <0>;
+							color = <LED_COLOR_ID_WHITE>;
+							function = LED_FUNCTION_LAN;
+							linux,default-trigger = "netdev";
+						};
+
+						led@1 {
+							reg = <1>;
+							color = <LED_COLOR_ID_AMBER>;
+							function = LED_FUNCTION_LAN;
+							linux,default-trigger = "netdev";
+						};
+					};
+				};
+			};
+
+			mdio-bus@1 {
+				reg = <1>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				lan3_phy: ethernet-phy@3 {
+					reg = <3>;
+
+					leds {
+						#address-cells = <1>;
+						#size-cells = <0>;
+
+						led@0 {
+							reg = <0>;
+							color = <LED_COLOR_ID_WHITE>;
+							function = LED_FUNCTION_LAN;
+							linux,default-trigger = "netdev";
+						};
+
+						led@1 {
+							reg = <1>;
+							color = <LED_COLOR_ID_AMBER>;
+							function = LED_FUNCTION_LAN;
+							linux,default-trigger = "netdev";
+						};
+					};
+				};
+			};
+
+			mdio-bus@2 {
+				reg = <2>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				lan1_phy: ethernet-phy@0 {
+					compatible = "ethernet-phy-ieee802.3-c45";
+					reg = <0>;
+
+					leds {
+						#address-cells = <1>;
+						#size-cells = <0>;
+
+						led@0 {
+							reg = <0>;
+							color = <LED_COLOR_ID_WHITE>;
+							function = LED_FUNCTION_LAN;
+							linux,default-trigger = "netdev";
+						};
+
+						led@1 {
+							reg = <1>;
+							color = <LED_COLOR_ID_AMBER>;
+							function = LED_FUNCTION_LAN;
+							linux,default-trigger = "netdev";
+						};
+					};
+				};
+			};
+		};
+
+		rtl9303_serdes_mdio: mdio-serdes {
+			compatible = "realtek,rtl9303-spi-serdes";
+		};
+
+		pcs {
+			compatible = "realtek,rtl9303-spi-pcs";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			mdio-parent-bus = <&rtl9303_serdes_mdio>;
+
+			rtl9303_sds3: serdes@3 {
+				reg = <3>;
+				#pcs-cells = <1>;
+			};
+
+			rtl9303_sds5: serdes@5 {
+				reg = <5>;
+				#pcs-cells = <1>;
+			};
+
+			rtl9303_sds6: serdes@6 {
+				reg = <6>;
+				#pcs-cells = <1>;
+			};
+
+			rtl9303_sds9: serdes@9 {
+				reg = <9>;
+				#pcs-cells = <1>;
+			};
+		};
+
+		ethernet-ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@8 {
+				reg = <8>;
+				label = "lan1";
+				phy-mode = "usxgmii";
+				managed = "in-band-status";
+				phy-handle = <&lan1_phy>;
+				pcs-handle = <&rtl9303_sds3 0>;
+			};
+
+			port@14 {
+				reg = <20>;
+				label = "lan2";
+				phy-mode = "2500base-x";
+				phy-handle = <&lan2_phy>;
+				pcs-handle = <&rtl9303_sds5 0>;
+			};
+
+			port@18 {
+				reg = <24>;
+				label = "lan3";
+				phy-mode = "2500base-x";
+				phy-handle = <&lan3_phy>;
+				pcs-handle = <&rtl9303_sds6 0>;
+			};
+
+			port@1b {
+				reg = <27>;
+				ethernet = <&swport5>;
+				phy-mode = "10gbase-r";
+				pcs-handle = <&rtl9303_sds9 0>;
+
+				fixed-link {
+					speed = <10000>;
+					full-duplex;
+				};
+			};
+		};
+	};
+};
+
+&tlmm {
+	i2c_2_pins: i2c-2-pins {
+		pins = "gpio46", "gpio47";
+		function = "blsp2_i2c";
+		drive-strength = <8>;
+		bias-disable;
+	};
+
+	spi_4_pins: spi-4-pins {
+		pins = "gpio5", "gpio6", "gpio7", "gpio8";
+		function = "blsp4_spi0";
+		drive-strength = <8>;
+		bias-disable;
+	};
+};
+
+&mdio {
+	status = "okay";
+
+	pinctrl-0 = <&mdio_pins>;
+	pinctrl-names = "default";
+	reset-gpios = <&tlmm 37 GPIO_ACTIVE_LOW>;
+
+	aqr113c: ethernet-phy@8 {
+		compatible = "ethernet-phy-ieee802.3-c45";
+		reg = <0x08>;
+		// reset-gpios = <&tlmm 63 GPIO_ACTIVE_LOW>;
+
+		leds {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			led@0 {
+				reg = <0>;
+				color = <LED_COLOR_ID_WHITE>;
+				function = LED_FUNCTION_WAN;
+				linux,default-trigger = "netdev";
+			};
+
+			led@1 {
+				reg = <1>;
+				color = <LED_COLOR_ID_AMBER>;
+				function = LED_FUNCTION_WAN;
+				linux,default-trigger = "netdev";
+			};
+		};
+	};
+
+	mxl3711: ethernet-phy@f {
+		//compatible = "ethernet-phy-ieee802.3-c45";
+		reg = <0x0f>;
+		// reset-gpios = <&tlmm 63 GPIO_ACTIVE_LOW>;
+	};
+};
+
+&uniphy1 {
+	status = "okay";
+};
+
+&uniphy2 {
+	status = "okay";
+};
+
+&switch {
+	status = "okay";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+			ethernet = <&edma>;
+			phy-mode = "internal";
+
+			fixed-link {
+				speed = <1000>;
+				full-duplex;
+			};
+		};
+
+		swport5: port@5 {
+			reg = <5>;
+			label = "lan-cpu";
+			nvmem-cells = <&base_mac 1>;
+			nvmem-cell-names = "mac-address";
+			phy-mode = "10gbase-r";
+			pcs-handle = <&uniphy1 0>;
+
+			fixed-link {
+				speed = <10000>;
+				full-duplex;
+			};
+		};
+
+		swport6: port@6 {
+			reg = <6>;
+			label = "wan";
+			nvmem-cells = <&base_mac 0>;
+			nvmem-cell-names = "mac-address";
+			phy-handle = <&aqr113c>;
+			phy-mode = "usxgmii";
+			managed = "in-band-status";
+			pcs-handle = <&uniphy2 0>;
+		};
+	};
+};
+
+&wifi {
+	status = "okay";
+	qcom,ath11k-fw-memory-mode = <1>;
+	qcom,ath11k-calibration-variant = "Verizon-CR1000A";
+};
+
+&pcie0 {
+	status = "okay";
+	perst-gpios = <&tlmm 58 GPIO_ACTIVE_LOW>;
+
+	pcie@0 {
+		wifi@0,0 {
+			status = "okay";
+			compatible = "pci17cb,1104";
+			qcom,ath11k-fw-memory-mode = <1>;
+			qcom,ath11k-calibration-variant = "Verizon-CR1000A";
+			reg = <0x00010000 0 0 0 0>;
+		};
+	};
+};
+
+&edma {
+	status = "okay";
+	qcom,disable-tso;
+};
+
+&pcie1 {
+	/* The unused 10000000 host has no endpoint on this board. */
+	status = "disabled";
+};
+
+&sdhc_1 {
+	status = "okay";
+	vqmmc-supply = <&l11>;
+	non-removable;
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	card@0 {
+		compatible = "mmc-card";
+		reg = <0>;
+
+		block {
+			compatible = "block-device";
+
+			partitions {
+				block-partition-appsblenv {
+					partname = "0:APPSBLENV";
+
+					nvmem-layout {
+						compatible = "u-boot,env";
+
+						base_mac: baseMAC {
+							compatible = "mac-base";
+							#nvmem-cell-cells = <1>;
+						};
+					};
+				};
+			};
+		};
+	};
+};

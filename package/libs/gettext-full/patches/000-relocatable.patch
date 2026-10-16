@@ -1,0 +1,30 @@
+--- a/gettext-tools/autotools/autopoint.in
++++ b/gettext-tools/autotools/autopoint.in
+@@ -28,7 +28,11 @@ archive_version=@ARCHIVE_VERSION@
+ 
+ # Set variables
+ # - gettext_datadir     directory where the data files are stored.
+-prefix="@prefix@"
++if [ -n "$STAGING_DIR_HOSTPKG" ]; then
++	prefix="$STAGING_DIR_HOSTPKG"
++else
++	prefix="@prefix@"
++fi
+ datarootdir="@datarootdir@"
+ : ${gettext_datadir="@datadir@/gettext"}
+ : ${AUTOM4TE=autom4te}
+--- a/gettext-tools/wizard/gettextize.in
++++ b/gettext-tools/wizard/gettextize.in
+@@ -28,7 +28,11 @@ archive_version=@ARCHIVE_VERSION@
+ 
+ # Set variables
+ # - gettext_datadir     directory where the data files are stored.
+-prefix="@prefix@"
++if [ -n "$STAGING_DIR_HOSTPKG" ]; then
++	prefix="$STAGING_DIR_HOSTPKG"
++else
++	prefix="@prefix@"
++fi
+ datarootdir="@datarootdir@"
+ : ${gettext_datadir="@datadir@/gettext"}
+ : ${AUTOM4TE=autom4te}

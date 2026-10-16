@@ -1,0 +1,72 @@
+From 7c6978fa5518ee3709afcee10183ae2771ad255d Mon Sep 17 00:00:00 2001
+From: Christian Marangi <ansuelsmth@gmail.com>
+Date: Wed, 28 May 2025 03:18:32 +0200
+Subject: [PATCH 24/29] airoha: add default configuration
+
+Signed-off-by: Christian Marangi <ansuelsmth@gmail.com>
+---
+ configs/an7581_evb_defconfig | 2 ++
+ configs/an7583_evb_defconfig | 2 ++
+ configs/en7523_evb_defconfig | 2 ++
+ defenvs/an7581_rfb_env       | 4 ++++
+ defenvs/an7583_rfb_env       | 4 ++++
+ defenvs/en7523_rfb_env       | 4 ++++
+ 6 files changed, 18 insertions(+)
+ create mode 100644 defenvs/an7581_rfb_env
+ create mode 100644 defenvs/an7583_rfb_env
+ create mode 100644 defenvs/en7523_rfb_env
+
+--- a/configs/an7581_evb_defconfig
++++ b/configs/an7581_evb_defconfig
+@@ -51,6 +51,8 @@ CONFIG_ENV_UBI_PART="ubi"
+ CONFIG_ENV_UBI_VOLUME="ubootenv"
+ CONFIG_ENV_UBI_VOLUME_REDUND="ubootenv2"
+ CONFIG_ENV_RELOC_GD_ENV_ADDR=y
++CONFIG_ENV_USE_DEFAULT_ENV_TEXT_FILE=y
++CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="defenvs/an7581_rfb_env"
+ CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG=y
+ CONFIG_NET_RANDOM_ETHADDR=y
+ CONFIG_SYS_RX_ETH_BUFFER=8
+--- a/configs/an7583_evb_defconfig
++++ b/configs/an7583_evb_defconfig
+@@ -48,6 +48,8 @@ CONFIG_ENV_UBI_PART="ubi"
+ CONFIG_ENV_UBI_VOLUME="ubootenv"
+ CONFIG_ENV_UBI_VOLUME_REDUND="ubootenv2"
+ CONFIG_ENV_RELOC_GD_ENV_ADDR=y
++CONFIG_ENV_USE_DEFAULT_ENV_TEXT_FILE=y
++CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="defenvs/an7583_rfb_env"
+ CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG=y
+ CONFIG_NET_RANDOM_ETHADDR=y
+ CONFIG_SYS_RX_ETH_BUFFER=8
+--- a/configs/en7523_evb_defconfig
++++ b/configs/en7523_evb_defconfig
+@@ -45,6 +45,8 @@ CONFIG_ENV_UBI_VOLUME="ubootenv"
+ CONFIG_ENV_UBI_VOLUME_REDUND="ubootenv2"
+ CONFIG_ENV_RELOC_GD_ENV_ADDR=y
+ CONFIG_ENV_MTD_DEV="spi-nand0"
++CONFIG_ENV_USE_DEFAULT_ENV_TEXT_FILE=y
++CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="defenvs/en7523_rfb_env"
+ CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG=y
+ CONFIG_NET_RANDOM_ETHADDR=y
+ CONFIG_SYS_RX_ETH_BUFFER=8
+--- /dev/null
++++ b/defenvs/an7581_rfb_env
+@@ -0,0 +1,4 @@
++loadaddr=0x81800000
++ipaddr=192.168.1.1
++serverip=192.168.1.10
++bootargs=ubi.mtd=ubi root=/dev/ubiblock0_5 rootwait
+--- /dev/null
++++ b/defenvs/an7583_rfb_env
+@@ -0,0 +1,4 @@
++loadaddr=0x81800000
++ipaddr=192.168.1.1
++serverip=192.168.1.10
++bootargs=ubi.mtd=ubi root=/dev/ubiblock0_5 rootwait
+--- /dev/null
++++ b/defenvs/en7523_rfb_env
+@@ -0,0 +1,4 @@
++loadaddr=0x81800000
++ipaddr=192.168.1.1
++serverip=192.168.1.10
++bootargs=ubi.mtd=ubi root=/dev/ubiblock0_5 rootwait
