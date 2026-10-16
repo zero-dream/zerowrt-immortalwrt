@@ -1,0 +1,173 @@
+PART_NAME=firmware
+REQUIRE_IMAGE_METADATA=1
+
+RAMFS_COPY_BIN='fw_printenv fw_setenv head seq'
+RAMFS_COPY_DATA='/etc/fw_env.config /var/lock/fw_printenv.lock'
+
+remove_oem_ubi_volume() {
+	local oem_volume_name="$1"
+	local oem_ubivol
+	local mtdnum
+	local ubidev
+
+	mtdnum=$(find_mtd_index "$CI_UBIPART")
+	if [ ! "$mtdnum" ]; then
+		return
+	fi
+
+	ubidev=$(nand_find_ubi "$CI_UBIPART")
+	if [ ! "$ubidev" ]; then
+		ubiattach --mtdn="$mtdnum"
+		ubidev=$(nand_find_ubi "$CI_UBIPART")
+	fi
+
+	if [ "$ubidev" ]; then
+		oem_ubivol=$(nand_find_volume "$ubidev" "$oem_volume_name")
+		[ "$oem_ubivol" ] && ubirmvol "/dev/$ubidev" --name="$oem_volume_name"
+	fi
+}
+
+platform_check_image() {
+	return 0;
+}
+
+# On RouterBOOT NAND devices the kernel is an ELF file inside a yaffs
+# partition rather than a raw image, so it has to be written with yafut. The
+# root filesystem is handled by UBI as usual. Extend the subtarget-wide list
+# instead of replacing it, so head/seq stay available for the other boards.
+RAMFS_COPY_BIN="$RAMFS_COPY_BIN yafut"
+
+platform_do_upgrade_mikrotik_nand() {
+	local fw_mtd board_dir
+
+	CI_KERNPART=none
+
+	fw_mtd=$(find_mtd_part kernel)
+	fw_mtd="${fw_mtd/block/}"
+	[ -n "$fw_mtd" ] || return 1
+
+	board_dir=$(tar tf "$1" | grep -m 1 '^sysupgrade-.*/$')
+	board_dir=${board_dir%/}
+	[ -n "$board_dir" ] || return 1
+
+	# Erase the yaffs partition first. Stock firmware already fills 4.38 MiB
+	# of the 8 MiB partition, leaving less free space than the loader ELF
+	# needs. yaffs only frees the old blocks after the write, so without
+	# erasing first the write would run out of space halfway through.
+	#
+	# A fully erased partition is a valid empty yaffs: the filesystem is log
+	# structured and keeps its metadata in the OOB area, there is no
+	# superblock to prepare.
+	#
+	# Recovery stays available either way, as RouterBOOT lives in a separate
+	# SPI-NOR flash that is not touched here.
+	mtd erase kernel || return 1
+
+	tar xf "$1" "${board_dir}/kernel" -O | \
+		yafut -d "$fw_mtd" -w -i - -o kernel -m 0755 || return 1
+
+	nand_do_upgrade "$1"
+}
+
+platform_do_upgrade() {
+	case "$(board_name)" in
+	mikrotik,chateau-5g-r17-ax)
+		platform_do_upgrade_mikrotik_nand "$1"
+		;;
+	alfa-network,ap120c-ax)
+		CI_UBIPART="rootfs_1"
+		alfa_bootconfig_rootfs_rotate "0:BOOTCONFIG" "148"
+		nand_do_upgrade "$1"
+		;;
+	cambiumnetworks,xe3-4)
+		fw_setenv bootcount 0
+		nand_do_upgrade "$1"
+		;;
+	anysafe,e1|\
+	dptech,ap3000-2c)
+		CI_UBIPART="rootfs"
+		nand_do_upgrade "$1"
+		;;
+	cmiot,ax18|\
+	redmi,ax5|\
+	xiaomi,ax1800|\
+	zn,m2|\
+	glinet,gl-ax1800|\
+	glinet,gl-axt1800|\
+	netgear,rbr350|\
+	netgear,rbs350|\
+	netgear,wax214|\
+	qihoo,360v6)
+		nand_do_upgrade "$1"
+		;;
+	jdcloud,re-cs-02|\
+	jdcloud,re-cs-07|\
+	jdcloud,re-ss-01|\
+	link,nn6000-v1|\
+	link,nn6000-v2|\
+	philips,ly1800|\
+	redmi,ax5-jdcloud|\
+	sy,y6010)
+		local cfgpart=$(find_mmc_part "0:BOOTCONFIG")
+		part_num="$(hexdump -e '1/1 "%01x|"' -n 1 -s 148 -C $cfgpart | cut -f 1 -d "|" | head -n1)"
+		if [ "$part_num" -eq "1" ]; then
+			CI_KERNPART="0:HLOS_1"
+			CI_ROOTPART="rootfs_1"
+		else
+			CI_KERNPART="0:HLOS"
+			CI_ROOTPART="rootfs"
+		fi
+		emmc_do_upgrade "$1"
+		;;
+	netgear,wax610|\
+	netgear,wax610y)
+		remove_oem_ubi_volume wifi_fw
+		remove_oem_ubi_volume ubi_rootfs
+		nand_do_upgrade "$1"
+		;;
+	linksys,mr7350|\
+	linksys,mr7500)
+		linksys_pre_upgrade "$1"
+		remove_oem_ubi_volume squashfs
+		nand_do_upgrade "$1"
+		;;
+	tplink,eap610-outdoor|\
+	tplink,eap620-hd-v2|\
+	tplink,eap620-hd-v3|\
+	tplink,eap623-outdoor-hd-v1|\
+	tplink,eap625-outdoor-hd-v1)
+		remove_oem_ubi_volume ubi_rootfs
+		tplink_do_upgrade "$1"
+		;;
+	yuncore,fap650)
+		[ "$(fw_printenv -n owrt_env_ver 2>/dev/null)" != "7" ] && yuncore_fap650_env_setup
+		local active="$(fw_printenv -n owrt_slotactive 2>/dev/null)"
+		if [ "$active" = "1" ]; then
+			CI_UBIPART="rootfs"
+		else
+			CI_UBIPART="rootfs_1"
+		fi
+		fw_setenv owrt_bootcount 0
+		fw_setenv owrt_slotactive $((1 - active))
+		nand_do_upgrade "$1"
+		;;
+	*)
+		default_do_upgrade "$1"
+		;;
+	esac
+}
+
+platform_copy_config() {
+	case "$(board_name)" in
+	jdcloud,re-cs-02|\
+	jdcloud,re-cs-07|\
+	jdcloud,re-ss-01|\
+	link,nn6000-v1|\
+	link,nn6000-v2|\
+	philips,ly1800|\
+	redmi,ax5-jdcloud|\
+	sy,y6010)
+		emmc_copy_config
+		;;
+	esac
+}
