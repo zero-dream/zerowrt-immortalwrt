@@ -1,0 +1,205 @@
+#!/bin/sh /etc/rc.common
+# shellcheck disable=3043,3010
+# Copyright (c) 2021 The Linux Foundation. All rights reserved.
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+
+# Apply NSS pbuf/N2H settings after NSS and ath11k have settled, then
+# restart wifi once so AP interfaces bind to the final NSS pbuf state.
+START=27
+NAME=qca-nss-pbuf
+pbuf_config_applied=0
+
+read_sysctl() {
+	sysctl -n -e "$1" 2> /dev/null
+}
+
+write_sysctl() {
+	sysctl -w "$1=$2" > /dev/null 2>&1
+}
+
+ath11k_runtime_available() {
+	[ -r /sys/module/ath11k/parameters/nss_offload ] || [ -d /sys/kernel/debug/ath11k ]
+}
+
+ath11k_nss_offload_enabled() {
+	local nss_offload
+
+	[ -r /sys/module/ath11k/parameters/nss_offload ] || return 1
+	nss_offload=$(cat /sys/module/ath11k/parameters/nss_offload 2> /dev/null)
+	case "$nss_offload" in
+		1 | Y | y | yes | true | on) return 0 ;;
+	esac
+
+	return 1
+}
+
+nss_sysctls_ready() {
+	[ -w /proc/sys/dev/nss/rps/hash_bitmap ] &&
+		[ -w /proc/sys/dev/nss/n2hcfg/extra_pbuf_core0 ] &&
+			[ -w /proc/sys/dev/nss/n2hcfg/n2h_wifi_pool_buf ]
+}
+
+wait_for_nss_sysctls() {
+	local timeout="${1:-5}"
+
+	while [ "$timeout" -gt 0 ]; do
+		nss_sysctls_ready && return 0
+		sleep 1
+		timeout=$((timeout - 1))
+	done
+
+	return 1
+}
+
+reload_wifi() {
+	[ "$pbuf_config_applied" -eq 1 ] || return 0
+	ath11k_nss_offload_enabled || return 0
+	[ -x /sbin/wifi ] || return 0
+
+	logger -t "$NAME" -p user.notice "Restarting wifi after NSS pbuf configuration"
+	sleep 2
+	/sbin/wifi up > /dev/null 2>&1 || logger -t "$NAME" -p user.notice "wifi restart command failed"
+}
+
+get_num_cpus() {
+	local num_cpus
+	num_cpus=$(awk -F': ' '/^processor/ {count++} END {print count}' /proc/cpuinfo)
+	echo "${num_cpus:-1}"
+}
+
+ensure_ecm_redirect() {
+	[ "$(read_sysctl dev.nss.general.redirect)" = "0" ] &&
+		[ -x /etc/init.d/qca-nss-ecm ] &&
+			/etc/init.d/qca-nss-ecm start > /dev/null 2>&1
+	return 0
+}
+
+apply_pbuf_profile() {
+	local board="$1"
+	local extra_pbuf_core0="$2"
+	local n2h_high_water_core0="$3"
+	local n2h_wifi_pool_buf="$4"
+	local extra_pbuf
+
+	ensure_ecm_redirect
+
+	# extra_pbuf_core0 cannot be changed after it is allocated.
+	extra_pbuf=$(read_sysctl dev.nss.n2hcfg.extra_pbuf_core0)
+	if [ "${extra_pbuf:-0}" = "0" ]; then
+		logger -t "$NAME" "$board - setting dev.nss.n2hcfg.extra_pbuf_core0=$extra_pbuf_core0"
+		write_sysctl dev.nss.n2hcfg.extra_pbuf_core0 "$extra_pbuf_core0"
+	else
+		logger -t "$NAME" "Sysctl key 'extra_pbuf_core0' already set to '$extra_pbuf'. Skipping extra_pbuf_core0 update"
+	fi
+
+	logger -t "$NAME" "$board - setting dev.nss.n2hcfg.n2h_wifi_pool_buf=$n2h_wifi_pool_buf"
+	write_sysctl dev.nss.n2hcfg.n2h_wifi_pool_buf "$n2h_wifi_pool_buf"
+
+	logger -t "$NAME" "$board - setting dev.nss.n2hcfg.n2h_high_water_core0=$n2h_high_water_core0"
+	write_sysctl dev.nss.n2hcfg.n2h_high_water_core0 "$n2h_high_water_core0"
+}
+
+apply_nss_config() {
+	local board extra_pbuf_core0 memtotal n2h_high_water_core0 n2h_wifi_pool_buf
+
+	write_sysctl dev.nss.clock.auto_scale 0
+	write_sysctl dev.nss.n2hcfg.n2h_queue_limit_core0 2048
+	write_sysctl dev.nss.n2hcfg.n2h_queue_limit_core1 2048
+
+	board=$(board_name)
+	memtotal=$(awk '/MemTotal/{print $2}' /proc/meminfo)
+
+	if [ "${memtotal:-0}" -le 256000 ]; then
+		extra_pbuf_core0=4000000
+		n2h_high_water_core0=16384
+		n2h_wifi_pool_buf=8192
+	elif [ "$memtotal" -le 512000 ]; then
+		extra_pbuf_core0=8000000
+		n2h_high_water_core0=32768
+		n2h_wifi_pool_buf=16384
+	else
+		extra_pbuf_core0=10000000
+		n2h_high_water_core0=65536
+		n2h_wifi_pool_buf=32768
+	fi
+
+	logger -t "$NAME" "Setting n2hcfg values for board: $board"
+	apply_pbuf_profile "$board" "$extra_pbuf_core0" "$n2h_high_water_core0" "$n2h_wifi_pool_buf"
+
+	pbuf_config_applied=1
+}
+
+set_stats_disable() {
+	[ -d /sys/kernel/debug/ath11k ] || return 0
+
+	find /sys/kernel/debug/ath11k -name stats_disable | while read -r stats_file; do
+		logger -t "$NAME" -p user.notice "Disabling ath11k stats"
+		echo 1 > "$stats_file"
+	done
+}
+
+set_scaling_governor() {
+	local available governor governor_file num num_cpus
+
+	governor="schedutil"
+	governor_file=/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors
+
+	[ -r "$governor_file" ] || return 0
+
+	available=$(cat "$governor_file" 2> /dev/null)
+	[ -n "$available" ] || return 0
+
+	case " $available " in
+		*" $governor "*)
+			logger -t "$NAME" -p user.notice "Setting CPU scaling governor to '$governor'"
+			num_cpus=$(get_num_cpus)
+			for num in $(seq 0 $((num_cpus - 1))); do
+				governor_file="/sys/devices/system/cpu/cpu${num}/cpufreq/scaling_governor"
+				[ -w "$governor_file" ] && echo "$governor" > "$governor_file"
+			done
+			;;
+		*)
+			logger -t "$NAME" -p user.error "'$governor' not available in CPU governors [ $available ]"
+			;;
+	esac
+}
+
+start() {
+	local hash_bitmap num_cpus
+
+	pbuf_config_applied=0
+	ath11k_runtime_available || {
+		logger -t "$NAME" -p user.notice "no Wi-Fi runtime detected. Skipping applying wifi nss configs"
+		return 0
+	}
+	ath11k_nss_offload_enabled || {
+		logger -t "$NAME" -p user.notice "ath11k NSS offload is unavailable or disabled. Skipping applying wifi nss configs"
+		return 0
+	}
+	wait_for_nss_sysctls 5 || {
+		logger -t "$NAME" -p user.notice "NSS RPS/N2H sysctls are unavailable. Skipping applying wifi nss configs"
+		return 0
+	}
+
+	apply_nss_config || return 1
+	[ "$pbuf_config_applied" -eq 1 ] || return 0
+
+	num_cpus=$(get_num_cpus)
+	hash_bitmap="$(((1 << num_cpus) - 1))"
+	write_sysctl dev.nss.rps.hash_bitmap "$hash_bitmap"
+
+	set_scaling_governor
+	set_stats_disable
+	reload_wifi
+}

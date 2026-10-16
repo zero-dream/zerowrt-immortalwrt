@@ -1,0 +1,341 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+
+/dts-v1/;
+
+#include "ipq8074.dtsi"
+#include "ipq8074-ess.dtsi"
+#include "ipq8074-nss.dtsi"
+#include "ipq8074-common.dtsi"
+#include "ipq8074-hk-cpu.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	model = "Linksys MX8500";
+	compatible = "linksys,mx8500", "qcom,ipq8074";
+
+	aliases {
+		serial0 = &blsp1_uart5;
+		serial1 = &blsp1_uart3;
+
+		led-boot = &led_system_blue;
+		led-running = &led_system_blue;
+		led-failsafe = &led_system_red;
+		led-upgrade = &led_system_green;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+		bootargs-append = " root=/dev/ubiblock0_0";
+	};
+
+	gpio-export {
+		compatible = "gpio-export";
+
+		bt_pwr {
+			gpio-export,name = "bt_pwr";
+			gpio-export,output = <1>;
+			gpios = <&tlmm 21 GPIO_ACTIVE_HIGH>;
+		};
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		reset-button {
+			label = "reset";
+			gpios = <&tlmm 67 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+
+		wps-button {
+			label = "wps";
+			gpios = <&tlmm 64 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_WPS_BUTTON>;
+		};
+	};
+};
+
+&tlmm {
+	button_pins: button-state {
+		pins = "gpio64", "gpio67";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+
+	mx8500_mdio_pins: mdio-state {
+		mdc-pins {
+			pins = "gpio68";
+			function = "mdc";
+			drive-strength = <8>;
+			bias-pull-up;
+		};
+
+		mdio-pins {
+			pins = "gpio69";
+			function = "mdio";
+			drive-strength = <8>;
+			bias-pull-up;
+		};
+	};
+};
+
+&blsp1_uart3 {
+	status = "okay";
+};
+
+&blsp1_uart5 {
+	status = "okay";
+};
+
+&prng {
+	status = "okay";
+};
+
+&qpic_bam {
+	status = "okay";
+};
+&qpic_nand {
+	status = "okay";
+
+	/*
+	 * Bootloader will find the NAND DT node by the compatible and
+	 * then "fixup" it by adding the partitions from the SMEM table
+	 * using the legacy bindings thus making it impossible for us
+	 * to change the partition table or utilize NVMEM for calibration.
+	 * So add a dummy partitions node that bootloader will populate
+	 * and set it as disabled so the kernel ignores it instead of
+	 * printing warnings due to the broken way bootloader adds the
+	 * partitions.
+	 */
+	partitions {
+		status = "disabled";
+	};
+
+	nand@0 {
+		reg = <0>;
+
+		nand-ecc-strength = <4>;
+		nand-ecc-step-size = <512>;
+		nand-bus-width = <8>;
+
+		partitions {
+			compatible = "qcom,smem-part";
+
+			partition-devinfo {
+				label = "devinfo";
+				read-only;
+
+				nvmem-layout {
+					compatible = "ascii-eq-delim-env";
+
+					hw_mac_addr: hw_mac_addr {
+						compatible = "mac-base";
+						#nvmem-cell-cells = <1>;
+					};
+				};
+			};
+
+			partition-0-ethphyfw {
+				label = "0:ethphyfw";
+				read-only;
+
+				nvmem-layout {
+					compatible = "fixed-layout";
+					#address-cells = <1>;
+					#size-cells = <1>;
+
+					aqr_fw: firmware@28 {
+						/* Skip the QCOM MBN Header of 40 bytes */
+						reg = <0x28 0x60002>;
+					};
+				};
+			};
+		};
+	};
+};
+
+&blsp1_i2c2 {
+	status = "okay";
+
+	led-controller@62 {
+		compatible = "nxp,pca9633";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x62>;
+		nxp,hw-blink;
+
+		led_system_red: led@0 {
+			reg = <0>;
+			color = <LED_COLOR_ID_RED>;
+			function = LED_FUNCTION_STATUS;
+		};
+
+		led_system_green: led@1 {
+			reg = <1>;
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_STATUS;
+		};
+
+		led_system_blue: led@2 {
+			reg = <2>;
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_STATUS;
+		};
+	};
+};
+
+&mdio {
+	status = "okay";
+
+	pinctrl-0 = <&mx8500_mdio_pins>;
+	pinctrl-names = "default";
+	reset-gpios = <&tlmm 37 GPIO_ACTIVE_LOW>;
+
+	ethernet-phy-package@0 {
+		compatible = "qcom,qca8075-package";
+		qcom,package-mode = "qsgmii";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0>;
+
+		qca8075_0: ethernet-phy@0 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <0>;
+		};
+
+		qca8075_1: ethernet-phy@1 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <1>;
+		};
+
+		qca8075_2: ethernet-phy@2 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <2>;
+		};
+
+		qca8075_3: ethernet-phy@3 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <3>;
+		};
+	};
+
+	aqr114c: ethernet-phy@8 {
+		compatible = "ethernet-phy-ieee802.3-c45";
+		reg = <8>;
+		reset-gpios = <&tlmm 44 GPIO_ACTIVE_LOW>;
+		firmware-name = "marvell/AQR-G4_v5.6.5-AQR_WNC_SAQA-L2_GT_ID45287_VER24005.cld";
+		nvmem-cells = <&aqr_fw>;
+		nvmem-cell-names = "firmware";
+	};
+};
+
+&switch {
+	status = "okay";
+
+	switch_lan_bmp = <(ESS_PORT1 | ESS_PORT2 | ESS_PORT3 | ESS_PORT4)>; /* lan port bitmap */
+	switch_wan_bmp = <ESS_PORT6>; /* wan port bitmap */
+	switch_mac_mode = <MAC_MODE_QSGMII>; /* mac mode for uniphy instance0*/
+	switch_mac_mode2 = <MAC_MODE_USXGMII>; /* mac mode for uniphy instance2*/
+
+	qcom,port_phyinfo {
+		port@1 {
+			port_id = <1>;
+			phy_address = <0>;
+		};
+
+		port@2 {
+			port_id = <2>;
+			phy_address = <1>;
+		};
+
+		port@3 {
+			port_id = <3>;
+			phy_address = <2>;
+		};
+
+		port@4 {
+			port_id = <4>;
+			phy_address = <3>;
+		};
+
+		port@6 {
+			port_id = <6>;
+			phy_address = <8>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			ethernet-phy-ieee802.3-c45;
+		};
+	};
+};
+
+&edma {
+	status = "okay";
+};
+
+&dp1 {
+	status = "okay";
+	phy-mode = "qsgmii";
+	phy-handle = <&qca8075_0>;
+	label = "lan1";
+	nvmem-cells = <&hw_mac_addr 1>;
+	nvmem-cell-names = "mac-address";
+};
+
+&dp2 {
+	status = "okay";
+	phy-mode = "qsgmii";
+	phy-handle = <&qca8075_1>;
+	label = "lan2";
+	nvmem-cells = <&hw_mac_addr 1>;
+	nvmem-cell-names = "mac-address";
+};
+
+&dp3 {
+	status = "okay";
+	phy-mode = "qsgmii";
+	phy-handle = <&qca8075_2>;
+	label = "lan3";
+	nvmem-cells = <&hw_mac_addr 1>;
+	nvmem-cell-names = "mac-address";
+};
+
+&dp4 {
+	status = "okay";
+	phy-mode = "qsgmii";
+	phy-handle = <&qca8075_3>;
+	label = "lan4";
+	nvmem-cells = <&hw_mac_addr 1>;
+	nvmem-cell-names = "mac-address";
+};
+
+&dp6_syn {
+	status = "okay";
+	phy-handle = <&aqr114c>;
+	label = "wan";
+	nvmem-cells = <&hw_mac_addr 0>;
+	nvmem-cell-names = "mac-address";
+};
+
+&pcie0 {
+	status = "okay";
+	perst-gpios = <&tlmm 61 GPIO_ACTIVE_LOW>;
+
+	pcie@0 {
+		wifi@0,0 {
+			status = "okay";
+			compatible = "pci17cb,1104";
+			qcom,ath11k-fw-memory-mode = <1>;
+			qcom,ath11k-calibration-variant = "Linksys-MX8500";
+			reg = <0x00010000 0 0 0 0>;
+		};
+	};
+};
+
+&wifi {
+	status = "okay";
+	qcom,ath11k-fw-memory-mode = <1>;
+	qcom,ath11k-calibration-variant = "Linksys-MX8500";
+};

@@ -1,0 +1,301 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/* Copyright (c) 2020 The Linux Foundation. All rights reserved. */
+
+/dts-v1/;
+
+#include "ipq8074.dtsi"
+#include "ipq8074-ess.dtsi"
+#include "ipq8074-nss.dtsi"
+#include "ipq8074-common.dtsi"
+#include "ipq8074-hk-cpu.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	model = "TP-Link TL-ER2260T";
+	compatible = "tplink,tl-er2260t", "qcom,ipq8074";
+
+	aliases {
+		ethernet0 = &dp1;
+		ethernet1 = &dp2;
+		ethernet2 = &dp3;
+		ethernet3 = &dp4;
+		ethernet4 = &dp5_syn;
+		ethernet5 = &dp6_syn;
+		label-mac-device = &dp5_syn;
+		serial0 = &blsp1_uart5;
+
+		led-boot = &led_system_green;
+		led-failsafe = &led_system_green;
+		led-running = &led_system_green;
+		led-upgrade = &led_system_green;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+		bootargs-append = " root=/dev/ubiblock0_1 coherent_pool=2M swiotlb=noforce";
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		reset {
+			label = "reset";
+			linux,code = <KEY_RESTART>;
+			gpios = <&tlmm 50 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led_system_green: system-green {
+			label = "green:system";
+			gpios = <&tlmm 21 GPIO_ACTIVE_HIGH>;
+			color = <LED_COLOR_ID_GREEN>;
+		};
+
+		led_usb_green {
+			label = "green:usb";
+			gpios = <&tlmm 22 GPIO_ACTIVE_HIGH>;
+			color = <LED_COLOR_ID_GREEN>;
+		};
+
+		led_sfp1_speed_green {
+			label = "green:sfp1-10g";
+			gpios = <&tlmm 52 GPIO_ACTIVE_HIGH>;
+			color = <LED_COLOR_ID_GREEN>;
+		};
+
+		led_sfp1_speed_amber {
+			label = "amber:sfp1-1g";
+			gpios = <&tlmm 54 GPIO_ACTIVE_HIGH>;
+			color = <LED_COLOR_ID_AMBER>;
+		};
+
+		led_sfp1_act_green {
+			label = "green:sfp1-act";
+			gpios = <&tlmm 51 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_GREEN>;
+		};
+
+		led_sfp2_speed_green {
+			label = "green:sfp2-10g";
+			gpios = <&tlmm 56 GPIO_ACTIVE_HIGH>;
+			color = <LED_COLOR_ID_GREEN>;
+		};
+
+		led_sfp2_speed_amber {
+			label = "amber:sfp2-1g";
+			gpios = <&tlmm 64 GPIO_ACTIVE_HIGH>;
+			color = <LED_COLOR_ID_AMBER>;
+		};
+
+		led_sfp2_act_green {
+			label = "green:sfp2-act";
+			gpios = <&tlmm 55 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_GREEN>;
+		};
+	};
+};
+
+&tlmm {
+	i2c_1_pins: i2c-1-pins {
+		pins = "gpio46", "gpio47";
+		function = "blsp2_i2c";
+		drive-strength = <8>;
+		bias-disable;
+	};
+
+	uniphy_pins: uniphy-pinmux {
+		mux {
+			pins = "gpio60";
+			function = "rx2";
+			bias-disable;
+		};
+
+		sfp_tx {
+			pins = "gpio59";
+			function = "gpio";
+			drive-strength = <8>;
+			bias-pull-down;
+			output-low;
+		};
+	};
+};
+
+&qpic_nand {
+	status = "okay";
+
+	nand@0 {
+		reg = <0>;
+
+		nand-ecc-strength = <4>;
+		nand-ecc-step-size = <512>;
+		nand-bus-width = <8>;
+
+		partitions {
+			compatible = "qcom,smem-part";
+
+			partition-0-ethphyfw {
+				label = "0:ethphyfw";
+
+				nvmem-layout {
+					compatible = "fixed-layout";
+					#address-cells = <1>;
+					#size-cells = <1>;
+
+					macaddr_lan: macaddr@0 {
+						reg = <0x0 0x6>;
+					};
+
+					macaddr_wan: macaddr@1 {
+						reg = <0x6 0x6>;
+					};
+				};
+			};
+		};
+	};
+};
+
+&mdio {
+	status = "okay";
+	pinctrl-0 = <&mdio_pins>;
+	pinctrl-names = "default";
+	reset-gpios = <&tlmm 37 GPIO_ACTIVE_LOW>;
+
+	ethernet-phy-package@0 {
+		compatible = "qcom,qca8075-package";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0>;
+
+		qca8075_0: ethernet-phy@0 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <0>;
+		};
+
+		qca8075_1: ethernet-phy@1 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <1>;
+		};
+
+		qca8075_2: ethernet-phy@2 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <2>;
+		};
+
+		qca8075_3: ethernet-phy@3 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <3>;
+		};
+	};
+};
+
+&switch {
+	status = "okay";
+
+	switch_lan_bmp = <(ESS_PORT1 | ESS_PORT2 | ESS_PORT3 | ESS_PORT4 | ESS_PORT5)>;
+	switch_wan_bmp = <ESS_PORT6>;
+	switch_mac_mode = <MAC_MODE_QSGMII>;
+	switch_mac_mode1 = <MAC_MODE_10GBASE_R>;
+	switch_mac_mode2 = <MAC_MODE_10GBASE_R>;
+
+	cmnblk_clk = "external_50MHz";
+
+	qcom,port_phyinfo {
+		port@0 {
+			port_id = <1>;
+			phy_address = <0>;
+		};
+
+		port@1 {
+			port_id = <2>;
+			phy_address = <1>;
+		};
+
+		port@2 {
+			port_id = <3>;
+			phy_address = <2>;
+		};
+
+		port@3 {
+			port_id = <4>;
+			phy_address = <3>;
+		};
+
+		sfp_1: port@4 {
+			port_id = <5>;
+			phy_address = <29>;
+			phy_i2c_address = <29>;
+			phy-i2c-mode;
+			media-type = "sfp";
+		};
+
+		sfp_2: port@5 {
+			port_id = <6>;
+			phy_address = <30>;
+			phy_i2c_address = <30>;
+			phy-i2c-mode;
+			media-type = "sfp";
+		};
+	};
+};
+
+&blsp1_i2c2 {
+	status = "okay";
+};
+
+&edma {
+	status = "okay";
+};
+
+&dp1 {
+	status = "okay";
+	phy-handle = <&qca8075_0>;
+	label = "ge1";
+	nvmem-cells = <&macaddr_lan>;
+	nvmem-cell-names = "mac-address";
+};
+
+&dp2 {
+	status = "okay";
+	phy-handle = <&qca8075_1>;
+	label = "ge2";
+	nvmem-cells = <&macaddr_lan>;
+	nvmem-cell-names = "mac-address";
+};
+
+&dp3 {
+	status = "okay";
+	phy-handle = <&qca8075_2>;
+	label = "ge3";
+	nvmem-cells = <&macaddr_lan>;
+	nvmem-cell-names = "mac-address";
+};
+
+&dp4 {
+	status = "okay";
+	phy-handle = <&qca8075_3>;
+	label = "ge4";
+	nvmem-cells = <&macaddr_lan>;
+	nvmem-cell-names = "mac-address";
+};
+
+&dp5_syn {
+	status = "okay";
+	phy-handle = <&sfp_1>;
+	label = "10ge1";
+	nvmem-cells = <&macaddr_wan>;
+	nvmem-cell-names = "mac-address";
+};
+
+&dp6_syn {
+	status = "okay";
+	phy-handle = <&sfp_2>;
+	label = "10ge2";
+	nvmem-cells = <&macaddr_lan>;
+	nvmem-cell-names = "mac-address";
+};
