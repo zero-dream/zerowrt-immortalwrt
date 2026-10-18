@@ -103,7 +103,7 @@ Signed-off-by: Balsam CHIHI <balsam.chihi@moment.tech>
  
  		if (ret) {
  			pr_err("Failed with error: %d to set queue priority class for int_pri: %d for profile_id: %d\n",
-@@ -480,7 +481,7 @@ txcmpl_ring_irq_name_alloc_fail:
+@@ -494,7 +495,7 @@ txcmpl_ring_irq_name_alloc_fail:
  	return ret;
  }
  
@@ -112,7 +112,7 @@ Signed-off-by: Balsam CHIHI <balsam.chihi@moment.tech>
  {
  	struct edma_hw_info *hw_info = edma_ctx->hw_info;
  	struct edma_ring_info *txcmpl = hw_info->txcmpl;
-@@ -588,44 +589,23 @@ static int edma_hw_reset(void)
+@@ -602,44 +603,23 @@ static int edma_hw_reset(void)
  	struct device *dev = ppe_dev->dev;
  	struct reset_control *edma_hw_rst;
  	struct device_node *edma_np;
@@ -167,7 +167,7 @@ Signed-off-by: Balsam CHIHI <balsam.chihi@moment.tech>
  
  	of_node_put(edma_np);
  
-@@ -647,14 +627,12 @@ static int edma_hw_configure(void)
+@@ -661,14 +641,12 @@ static int edma_hw_configure(void)
  
  	pr_debug("EDMA ver %d hw init\n", data);
  
@@ -183,7 +183,7 @@ Signed-off-by: Balsam CHIHI <balsam.chihi@moment.tech>
  		return ret;
  	}
  
-@@ -668,7 +646,7 @@ static int edma_hw_configure(void)
+@@ -682,7 +660,7 @@ static int edma_hw_configure(void)
  	edma_ctx->dummy_dev = alloc_netdev_dummy(0);
  	if (!edma_ctx->dummy_dev) {
  		ret = -ENOMEM;
@@ -192,7 +192,7 @@ Signed-off-by: Balsam CHIHI <balsam.chihi@moment.tech>
  		goto dummy_dev_alloc_failed;
  	}
  
-@@ -682,7 +660,7 @@ static int edma_hw_configure(void)
+@@ -696,7 +674,7 @@ static int edma_hw_configure(void)
  
  	ret = edma_alloc_rings();
  	if (ret) {
@@ -201,7 +201,7 @@ Signed-off-by: Balsam CHIHI <balsam.chihi@moment.tech>
  		goto edma_alloc_rings_failed;
  	}
  
-@@ -702,7 +680,7 @@ static int edma_hw_configure(void)
+@@ -716,7 +694,7 @@ static int edma_hw_configure(void)
  
  	ret = edma_cfg_rx_rings();
  	if (ret) {
@@ -210,7 +210,7 @@ Signed-off-by: Balsam CHIHI <balsam.chihi@moment.tech>
  		goto edma_cfg_rx_rings_failed;
  	}
  
-@@ -720,15 +698,13 @@ static int edma_hw_configure(void)
+@@ -734,15 +712,13 @@ static int edma_hw_configure(void)
  	if (ret)
  		return ret;
  
@@ -227,7 +227,7 @@ Signed-off-by: Balsam CHIHI <balsam.chihi@moment.tech>
  	data = EDMA_MISC_AXI_RD_ERR_MASK |
  		EDMA_MISC_AXI_WR_ERR_MASK |
  		EDMA_MISC_RX_DESC_FIFO_FULL_MASK |
-@@ -743,15 +719,15 @@ static int edma_hw_configure(void)
+@@ -757,15 +733,15 @@ static int edma_hw_configure(void)
  	edma_cfg_rx_napi_add();
  	edma_cfg_rx_napi_enable();
  
@@ -246,7 +246,7 @@ Signed-off-by: Balsam CHIHI <balsam.chihi@moment.tech>
  	ret = (int)edma_configure_ucast_prio_map_tbl();
  	if (ret) {
  		pr_err("Failed to initialize unicast priority map table: %d\n",
-@@ -759,7 +735,6 @@ static int edma_hw_configure(void)
+@@ -773,7 +749,6 @@ static int edma_hw_configure(void)
  		goto configure_ucast_prio_map_tbl_failed;
  	}
  
@@ -254,7 +254,7 @@ Signed-off-by: Balsam CHIHI <balsam.chihi@moment.tech>
  	ret = edma_cfg_rx_rps_hash_map();
  	if (ret) {
  		pr_err("Failed to configure rps hash table: %d\n",
-@@ -803,14 +778,13 @@ void edma_destroy(struct ppe_device *ppe
+@@ -817,14 +792,13 @@ void edma_destroy(struct ppe_device *ppe
  		edma_ctx->rx_rps_ctl_table_hdr = NULL;
  	}
  
@@ -270,7 +270,7 @@ Signed-off-by: Balsam CHIHI <balsam.chihi@moment.tech>
  	for (i = 0; i < txcmpl->num_rings; i++) {
  		synchronize_irq(edma_ctx->intr_info.intr_txcmpl[i]);
  
-@@ -820,7 +794,7 @@ void edma_destroy(struct ppe_device *ppe
+@@ -834,7 +808,7 @@ void edma_destroy(struct ppe_device *ppe
  	}
  	kfree(edma_txcmpl_irq_name);
  
@@ -279,7 +279,7 @@ Signed-off-by: Balsam CHIHI <balsam.chihi@moment.tech>
  	for (i = 0; i < rx->num_rings; i++) {
  		synchronize_irq(edma_ctx->intr_info.intr_rx[i]);
  		free_irq(edma_ctx->intr_info.intr_rx[i],
-@@ -861,7 +835,7 @@ static struct ctl_table edma_rx_rps_core
+@@ -875,7 +849,7 @@ static struct ctl_table edma_rx_rps_core
   * edma_setup - EDMA Setup.
   * @ppe_dev: PPE device
   *
@@ -288,7 +288,7 @@ Signed-off-by: Balsam CHIHI <balsam.chihi@moment.tech>
   *
   * Return 0 on success, negative error code on failure.
   */
-@@ -889,22 +863,19 @@ int edma_setup(struct ppe_device *ppe_de
+@@ -903,22 +877,19 @@ int edma_setup(struct ppe_device *ppe_de
  		return -EINVAL;
  	}
  
@@ -313,7 +313,7 @@ Signed-off-by: Balsam CHIHI <balsam.chihi@moment.tech>
  	if (ret) {
  		dev_err(dev, "Error in irq initialization\n");
  		return ret;
-@@ -925,70 +896,3 @@ int edma_setup(struct ppe_device *ppe_de
+@@ -939,70 +910,3 @@ int edma_setup(struct ppe_device *ppe_de
  
  	return 0;
  }
@@ -833,7 +833,7 @@ Signed-off-by: Balsam CHIHI <balsam.chihi@moment.tech>
   */
  
  /* ethtool support for EDMA */
-@@ -242,33 +242,6 @@ static int edma_set_pauseparam(struct ne
+@@ -243,33 +243,6 @@ static int edma_set_pauseparam(struct ne
  	return phylink_ethtool_set_pauseparam(port->phylink, pause);
  }
  
@@ -867,7 +867,7 @@ Signed-off-by: Balsam CHIHI <balsam.chihi@moment.tech>
  static const struct ethtool_ops edma_ethtool_ops = {
  	.get_strings = &edma_get_strings,
  	.get_sset_count = &edma_get_strset_count,
-@@ -278,8 +251,6 @@ static const struct ethtool_ops edma_eth
+@@ -279,8 +252,6 @@ static const struct ethtool_ops edma_eth
  	.set_link_ksettings = edma_set_link_ksettings,
  	.get_pauseparam = &edma_get_pauseparam,
  	.set_pauseparam = &edma_set_pauseparam,

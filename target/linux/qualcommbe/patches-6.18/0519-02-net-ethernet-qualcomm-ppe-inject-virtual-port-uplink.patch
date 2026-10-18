@@ -63,7 +63,7 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
  }
  
  /**
-@@ -894,6 +896,7 @@ int edma_setup(struct ppe_device *ppe_de
+@@ -908,6 +910,7 @@ int edma_setup(struct ppe_device *ppe_de
  
  	edma_ctx->ppe_dev = ppe_dev;
  	edma_ctx->has_vports = ppe_dev->variant->has_vports;
