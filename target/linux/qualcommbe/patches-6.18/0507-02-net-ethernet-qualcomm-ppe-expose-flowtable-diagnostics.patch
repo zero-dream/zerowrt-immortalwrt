@@ -15,9 +15,9 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  #include "ppe_debugfs.h"
 +#include "ppe_flowtable.h"
  #include "ppe_regs.h"
+ #include "ppe_vp.h"
  
- #define PPE_PKT_CNT_TBL_SIZE				3
-@@ -920,6 +921,8 @@ void ppe_debugfs_setup(struct ppe_device
+@@ -943,6 +944,8 @@ void ppe_debugfs_setup(struct ppe_device
  		return;
  	}
  

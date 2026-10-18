@@ -21,7 +21,7 @@ Signed-off-by: ViKing <viking.yfy@qq.com>
  
 --- a/drivers/net/wireless/ath/ath12k/pci.c
 +++ b/drivers/net/wireless/ath/ath12k/pci.c
-@@ -1718,7 +1718,6 @@ static void ath12k_pci_remove(struct pci
+@@ -1724,7 +1724,6 @@ static void ath12k_pci_remove(struct pci
  
  qmi_fail:
  	ath12k_core_deinit(ab);

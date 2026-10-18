@@ -32,7 +32,7 @@ Signed-off-by: JiaY-shi <shi05275@163.com>
  
 --- a/drivers/net/wireless/ath/ath12k/mhi.c
 +++ b/drivers/net/wireless/ath/ath12k/mhi.c
-@@ -149,6 +149,8 @@ static void ath12k_mhi_op_status_cb(stru
+@@ -150,6 +150,8 @@ static void ath12k_mhi_op_status_cb(stru
  		ath12k_warn(ab, "firmware crashed: MHI_CB_SYS_ERROR\n");
  		break;
  	case MHI_CB_EE_RDDM:
