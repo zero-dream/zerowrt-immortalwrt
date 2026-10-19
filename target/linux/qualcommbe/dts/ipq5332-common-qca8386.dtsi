@@ -43,6 +43,27 @@
 			 <&qca8386_rx_312p5m>, <&qca8386_tx_312p5m>;
 		#clock-cells = <1>;
 		#reset-cells = <1>;
+
+		/* Switch mode uses UNIPHY1 TX for both directions on MAC1-4.
+		 * Select it before PHY initialization requests idle MAC rates;
+		 * these RCGs retain their selected parent during rate changes.
+		 */
+		assigned-clocks = <&qca8386_nsscc NSS_CC_MAC1_TX_CLK_SRC>,
+				  <&qca8386_nsscc NSS_CC_MAC1_RX_CLK_SRC>,
+				  <&qca8386_nsscc NSS_CC_MAC2_TX_CLK_SRC>,
+				  <&qca8386_nsscc NSS_CC_MAC2_RX_CLK_SRC>,
+				  <&qca8386_nsscc NSS_CC_MAC3_TX_CLK_SRC>,
+				  <&qca8386_nsscc NSS_CC_MAC3_RX_CLK_SRC>,
+				  <&qca8386_nsscc NSS_CC_MAC4_TX_CLK_SRC>,
+				  <&qca8386_nsscc NSS_CC_MAC4_RX_CLK_SRC>;
+		assigned-clock-parents = <&qca8386_tx_312p5m>,
+					 <&qca8386_tx_312p5m>,
+					 <&qca8386_tx_312p5m>,
+					 <&qca8386_tx_312p5m>,
+					 <&qca8386_tx_312p5m>,
+					 <&qca8386_tx_312p5m>,
+					 <&qca8386_tx_312p5m>,
+					 <&qca8386_tx_312p5m>;
 	};
 
 	qca8386_phy_package: ethernet-phy-package@1 {

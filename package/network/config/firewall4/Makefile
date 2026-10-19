@@ -5,7 +5,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=firewall4
-PKG_RELEASE:=8
+PKG_RELEASE:=10
+
+PKG_CONFIG_DEPENDS:= \
+	CONFIG_TARGET_mediatek_filogic CONFIG_TARGET_qualcommax \
+	CONFIG_TARGET_qualcommbe CONFIG_TARGET_airoha \
+	CONFIG_TARGET_rockchip CONFIG_TARGET_x86
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL=$(PROJECT_GIT)/project/firewall4.git
@@ -45,6 +50,10 @@ endef
 define Package/firewall4/install
 	$(CP) -a $(PKG_BUILD_DIR)/root/* $(1)/
 	$(CP) -a ./files/* $(1)/
+ifneq ($(CONFIG_TARGET_mediatek_filogic)$(CONFIG_TARGET_qualcommax)$(CONFIG_TARGET_qualcommbe)$(CONFIG_TARGET_airoha)$(CONFIG_TARGET_rockchip)$(CONFIG_TARGET_x86),)
+	# router-tool supplies platform defaults before firewall startup.
+	$(SED) '/^[[:space:]]*option flow_offloading[[:space:]]/d; /^[[:space:]]*option flow_offloading_hw[[:space:]]/d' $(1)/etc/config/firewall
+endif
 endef
 
 define Build/Compile

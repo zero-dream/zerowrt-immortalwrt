@@ -1,0 +1,14 @@
+{
+	"luci-app-router-tool": {
+		"description": "Read board Ethernet port assignments for router tool presets",
+		"read": {
+			"file": {
+				"/etc/board.json": [ "read" ],
+				"/usr/share/router-tool/auto.json": [ "read" ]
+			},
+			"ubus": {
+				"file": [ "read" ]
+			}
+		}
+	}
+}
