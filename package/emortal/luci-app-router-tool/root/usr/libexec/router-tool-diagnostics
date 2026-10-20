@@ -14,9 +14,12 @@ cat /etc/openwrt_release
 cat /proc/uptime
 
 section router-tool
-for option in router_tool_auto router_tool_ap router_tool_ula_cleanup_done; do
+for option in router_tool_auto router_tool_ap router_tool_ula_cleanup_done router_tool_offload_defaults_done packet_steering steering_flows; do
 	value=$(uci -q get "network.@globals[0].$option")
 	printf '%s=%s\n' "$option" "$value"
+done
+for option in flow_offloading flow_offloading_hw; do
+	printf '%s=%s\n' "$option" "$(uci -q get "firewall.@defaults[0].$option")"
 done
 for file in /var/run/router-tool-status /var/run/router-tool-log-error /var/run/router-tool-log-pending /var/run/router-tool-log-wireless-pending /var/run/router-tool-log-wireless-board /var/run/router-tool-reload-pending; do
 	[ -r "$file" ] || continue

@@ -38,33 +38,39 @@ start_service() {
 }
 
 reload_service() {
-	local changed plan remaining service need_network=0 need_firewall=0 need_dhcp=0
-	changed="$(/usr/libexec/router-tool-auto)" || return 1
-	case " $changed " in
-		*" network "*) need_network=1 need_dhcp=1 ;;
-	esac
-	case " $changed " in
-		*" wireless "*) need_network=1 ;;
-	esac
-	case " $changed " in
-		*" dhcp "*) need_dhcp=1 ;;
-	esac
-	case " $changed " in
-		*" firewall "*) need_firewall=1 ;;
-	esac
+	local changed result plan remaining service config
+	changed="$(/usr/libexec/router-tool-auto)"
+	result=$?
 	plan="$(cat "$RELOAD_PLAN" 2>/dev/null)"
-	[ "$need_network" -eq 0 ] || plan="$plan netifd"
-	[ "$need_firewall" -eq 0 ] || plan="$plan firewall"
-	[ "$need_dhcp" -eq 0 ] || {
-		plan="$plan odhcpd"
-		[ ! -x /etc/init.d/dnsmasq ] || plan="$plan dnsmasq"
-	}
+	for config in $changed; do
+		case "$config" in
+			network) plan="$plan netifd odhcpd dnsmasq" ;;
+			wireless) plan="$plan netifd" ;;
+			firewall) plan="$plan firewall" ;;
+			dhcp) plan="$plan odhcpd dnsmasq" ;;
+		esac
+	done
 	remaining=
 	for service in netifd firewall odhcpd dnsmasq; do
+		[ "$service" != dnsmasq ] || [ -x /etc/init.d/dnsmasq ] || continue
 		case " $plan " in *" $service "*) remaining="${remaining:+$remaining }$service" ;; esac
 	done
-	[ -n "$remaining" ] || return 0
 	save_reload_plan "$remaining" || return 1
+	[ "$result" -eq 0 ] || return "$result"
+	[ -n "$remaining" ] || return 0
+	# Reloads also read the shared UCI delta directory. An older queued
+	# request must not apply edits which the helper deliberately deferred.
+	for config in network dhcp firewall; do
+		[ ! -s "/tmp/.uci/$config" ] || return 0
+	done
+	# PHY events can arrive before S20network starts netifd. Keep the plan;
+	# the first interface event will dispatch it once the object is present.
+	case " $remaining " in
+		*" netifd "*)
+			[ ! -s /tmp/.uci/wireless ] || return 0
+			[ -n "$(ubus -S list network 2>/dev/null)" ] || return 0
+			;;
+	esac
 	logger -t router-tool -p daemon.info "Requesting service reloads: $remaining"
 	for service in $remaining; do
 		case "$service" in

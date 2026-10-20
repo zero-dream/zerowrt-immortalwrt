@@ -18,6 +18,7 @@ function log_once(priority, key, message) {
 openlog('router-tool', LOG_PID, LOG_DAEMON);
 let stage = 'configuration lock';
 let lock;
+let committed = [];
 try {
 	lock = open('/var/lock/router-tool.lock', 'a');
 	if (!lock || !lock.lock('x')) die('Cannot lock router tool configuration');
@@ -93,9 +94,12 @@ try {
 		if (sprintf('%J', previous_lan) != sprintf('%J', next_lan))
 			log_once(LOG_NOTICE, 'lan', sprintf('LAN subnet overlaps WAN; changing %J to %J', previous_lan, next_lan));
 	}
-	for (let config in changed) {
+	// Write the role/default markers last. A failed earlier commit must not
+	// suppress reconstruction of the unfinished transaction on the next event.
+	for (let config in filter([ 'firewall', 'dhcp', 'wireless', 'network' ], name => index(changed, name) >= 0)) {
 		stage = 'commit ' + config;
 		if (!uci.commit(config)) die(`Unable to commit router tool settings in ${config}`);
+		push(committed, config);
 		syslog(LOG_INFO, '%s', 'Committed configuration: ' + config);
 	}
 	let mode = ap ? 'ap' : uci.get('network', 'wan', 'proto') == 'pppoe' ? 'main' : 'sub';
@@ -119,6 +123,9 @@ catch (e) {
 	let message = 'Failed during ' + stage + ': ' + e.message;
 	log_once(LOG_ERR, 'error', message);
 	warn('router-tool: ' + message + '\n');
+	// The service retains reload requests for files already committed even
+	// when a later commit fails. It dispatches them after a successful retry.
+	if (length(committed)) print(join(' ', committed), '\n');
 	closelog();
 	exit(1);
 }

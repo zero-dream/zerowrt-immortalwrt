@@ -10,9 +10,8 @@ let recorder = null;
 function setOptions(config, sid, values) {
 	for (const [ key, value ] of Object.entries(values)) {
 		if (recorder && !recorder.created.some(s => s.config == config && s.sid == sid)) {
-			const id = `${config}/${sid}/${key}`;
-			if (!recorder.options.some(option => option.id == id))
-				recorder.options.push({ id, config, sid, key, value: uci.get(config, sid, key) ?? null });
+			if (!recorder.options.some(option => option.config == config && option.sid == sid && option.key == key))
+				recorder.options.push({ config, sid, key, value: uci.get(config, sid, key) ?? null });
 		}
 		if (value == null) uci.unset(config, sid, key);
 		else uci.set(config, sid, key, value);
@@ -32,7 +31,14 @@ function globals() {
 }
 
 function apState(sid) {
-	try { return JSON.parse(uci.get('network', sid, 'router_tool_ap_state') || 'null'); }
+	try {
+		const state = JSON.parse(uci.get('network', sid, 'router_tool_ap_state') || 'null');
+		const validSection = s => s && [ 'network', 'dhcp', 'firewall', 'wireless' ].includes(s.config) && typeof s.sid == 'string' && s.sid.length;
+		if (!Array.isArray(state?.options) || !Array.isArray(state?.created) ||
+			!state.created.every(validSection) || !state.options.every(o => validSection(o) && typeof o.key == 'string' && o.key.length &&
+				(o.value == null || typeof o.value == 'string' || Array.isArray(o.value) && o.value.every(v => typeof v == 'string')))) return null;
+		return state;
+	}
 	catch (e) { return null; }
 }
 
@@ -56,8 +62,11 @@ function validateAp(topo, context) {
 		throw new Error(_('Cannot read board port assignments. Configure AP ports manually.'));
 	if (!topo.wan || topo.wan.startsWith('@'))
 		throw new Error(_('Cannot identify the Ethernet WAN device. Configure LAN/WAN devices first.'));
+	const devices = uci.sections('network', 'device');
 	if (uci.sections('network', 'switch').length || uci.sections('network', 'switch_vlan').length ||
 		uci.sections('network', 'bridge-vlan').some(s => s.device == topo.bridgeName) ||
+		devices.some(s => s.name != topo.bridgeName && L.toArray(s.ports).some(port => topo.ports.includes(port))) ||
+		devices.some(s => topo.ports.includes(s.name) && s.type && ![ '8023', 'ethernet' ].includes(s.type)) ||
 		topo.ports.some(port => /[.@:]/.test(port) || port == topo.bridgeName || /^(br-|wlan|phy)/.test(port)))
 		throw new Error(_('Automatic AP conversion requires plain Ethernet ports. Configure VLAN or switch topologies manually.'));
 }
@@ -121,9 +130,13 @@ function avoidSubnetConflict(context) {
 		return (a.address & mask) == (b.address & mask);
 	};
 	if (!lan.some(a => upstream.some(b => overlaps(a, b)))) return;
+	const occupied = upstream.slice();
+	for (const section of uci.sections('network', 'interface'))
+		if (section['.name'] != 'lan')
+			occupied.push(...L.toArray(section.ipaddr).map(address => subnet(address, section.netmask)).filter(Boolean));
 	for (let i = 2; i < 255; i++) {
 		const address = `192.168.${i}.1/24`;
-		if (upstream.every(b => !overlaps(subnet(address), b))) {
+		if (occupied.every(b => !overlaps(subnet(address), b))) {
 			console.info(`[router-tool] LAN subnet overlaps upstream; staging ${address}`);
 			setOptions('network', 'lan', { ipaddr: address, netmask: null });
 			return;
@@ -171,9 +184,11 @@ function enableAp(sid, context) {
 			ensure('dhcp', 'dhcp', name);
 			setOptions('dhcp', name, { interface: name, ignore: '1', dhcpv4: 'disabled', ra: 'disabled', dhcpv6: 'disabled', ndp: 'disabled', master: '0', ndproxy_routing: null });
 		}
-		for (const section of uci.sections('wireless', 'wifi-iface'))
-			if ([ 'ap', 'ap-wds' ].includes(uci.get('wireless', section['.name'], 'mode')))
-				setOptions('wireless', section['.name'], { network: [ 'lan' ] });
+		for (const section of uci.sections('wireless', 'wifi-iface')) {
+			const networks = L.toArray(uci.get('wireless', section['.name'], 'network'));
+			if ([ 'ap', 'ap-wds' ].includes(section.mode) && networks.some(name => [ 'lan', 'wan', 'wan6' ].includes(name)))
+				setOptions('wireless', section['.name'], { network: Array.from(new Set(networks.map(name => [ 'wan', 'wan6' ].includes(name) ? 'lan' : name))) });
+		}
 		configureFirewall('relay_ap', context.presets.firewall);
 	}
 	finally { recorder = null; }
@@ -185,7 +200,7 @@ function enableAp(sid, context) {
 function disableAp(sid) {
 	const state = apState(sid);
 	if (!state)
-		throw new Error(_('The saved configuration is missing. Restore LAN/WAN settings manually before disabling AP mode.'));
+		throw new Error(_('The saved configuration is missing or invalid. Restore LAN/WAN settings manually before disabling AP mode.'));
 	for (const option of state.options.slice().reverse())
 		if (uci.get(option.config, option.sid) != null)
 			setOptions(option.config, option.sid, { [option.key]: option.value });

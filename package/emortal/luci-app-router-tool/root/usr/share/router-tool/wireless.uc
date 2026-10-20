@@ -52,7 +52,10 @@ export function synchronize_wireless(uci, board) {
 		}
 	}
 	for (let radio in radios) {
-		let aps = filter(interfaces, iface => iface.device == radio['.name'] && iface.mode == 'ap');
+		let attached = filter(interfaces, iface => iface.device == radio['.name']);
+		// A station/mesh/WDS backhaul owns the shared radio settings.
+		if (length(filter(attached, iface => iface.mode != 'ap'))) continue;
+		let aps = attached;
 		if (!length(aps) || length(filter(aps, iface => iface.ssid != 'OWRT' || iface.key != '12345678' || iface.encryption != 'psk2+ccmp'))) continue;
 		let band = { '2g': '2G', '5g': '5G', '6g': '6G' }[radio.band];
 		if (!band) continue;
