@@ -117,10 +117,17 @@ export function synchronize(uci, data, upstream4, target) {
 		let upstream = filter(map(upstream4 || [], address => subnet(address)), address => address != null);
 		let lan = filter(map(array(uci.get('network', 'lan', 'ipaddr')), address => subnet(address, uci.get('network', 'lan', 'netmask'))), address => address != null);
 		if (length(filter(lan, a => length(filter(upstream, b => overlaps(a, b)))))) {
+			let occupied = [ ...upstream ];
+			for (let section in sections(uci, 'network', 'interface'))
+				if (section['.name'] != 'lan')
+					for (let address in array(section.ipaddr)) {
+						let parsed = subnet(address, section.netmask);
+						if (parsed) push(occupied, parsed);
+					}
 			let address = null;
 			for (let i = 2; i < 255; i++) {
 				let candidate = `192.168.${i}.1/24`;
-				if (!length(filter(upstream, b => overlaps(subnet(candidate), b)))) { address = candidate; break; }
+				if (!length(filter(occupied, b => overlaps(subnet(candidate), b)))) { address = candidate; break; }
 			}
 			if (!address) die('No non-overlapping IPv4 LAN subnet found');
 			set('network', 'lan', { ipaddr: address, netmask: null });

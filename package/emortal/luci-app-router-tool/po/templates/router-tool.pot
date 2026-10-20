@@ -1,22 +1,22 @@
 msgid ""
 msgstr "Content-Type: text/plain; charset=UTF-8"
 
-#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:62
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:71
 msgid ""
 "Automatic AP conversion requires plain Ethernet ports. Configure VLAN or "
 "switch topologies manually."
 msgstr ""
 
-#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:58
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:64
 msgid ""
 "Cannot identify the Ethernet WAN device. Configure LAN/WAN devices first."
 msgstr ""
 
-#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:56
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:62
 msgid "Cannot read board port assignments. Configure AP ports manually."
 msgstr ""
 
-#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:249
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:264
 msgid ""
 "Manually enable to bridge all Ethernet ports and obtain IPv4/IPv6 from the "
 "upstream router; disable to restore the previous settings. When disabled, "
@@ -24,7 +24,7 @@ msgid ""
 "router mode."
 msgstr ""
 
-#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:132
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:145
 msgid ""
 "No free LAN subnet was found. Configure a non-overlapping IPv4 subnet "
 "manually."
@@ -34,12 +34,12 @@ msgstr ""
 msgid "Read board Ethernet port assignments for router tool presets"
 msgstr ""
 
-#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:248
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:263
 msgid "Relay AP mode"
 msgstr ""
 
-#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:188
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:203
 msgid ""
-"The saved configuration is missing. Restore LAN/WAN settings manually before "
-"disabling AP mode."
+"The saved configuration is missing or invalid. Restore LAN/WAN settings "
+"manually before disabling AP mode."
 msgstr ""
