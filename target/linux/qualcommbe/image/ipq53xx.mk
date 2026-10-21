@@ -61,7 +61,6 @@ define Device/glinet_gl-be6500
 	DEVICE_MODEL := GL-BE6500
 	DEVICE_DTS_CONFIG := config@mi01.2
 	KERNEL_INSTALL := 1
-	KERNEL_SIZE := 6144k
 	BLOCKSIZE := 256k
 	PAGESIZE := 4096
 	SOC := ipq5322
@@ -121,7 +120,6 @@ define Device/xiaomi_be6500
 	DEVICE_VENDOR := Xiaomi
 	DEVICE_MODEL := BE6500
 	DEVICE_DTS_CONFIG := config@mi01.2
-	KERNEL_SIZE := 6144k
 	BLOCKSIZE := 128k
 	PAGESIZE := 2048
 	SOC := ipq5312
