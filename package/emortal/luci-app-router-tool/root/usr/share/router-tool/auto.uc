@@ -1,4 +1,6 @@
 // Shared preset data is also used by the LuCI post-parse save callback.
+import { read_snapshot, check_snapshot, record_option, record_context, finish_snapshot } from './snapshot.uc';
+
 function sections(uci, config, type) {
 	let result = [];
 	uci.foreach(config, type, section => push(result, section));
@@ -42,15 +44,29 @@ function overlaps(a, b) {
 
 export function synchronize(uci, data, upstream4, target) {
 	let changed = {};
+	let recorder = null;
 	function ensure(config, type_name, sid) {
-		if (!uci.get_all(config, sid)) {
+		let section = uci.get_all(config, sid);
+		if (section && section['.type'] != type_name) die(`Mode switch refused: section type changed at ${config}.${sid}`);
+		if (!section) {
 			if (!uci.set(config, sid, type_name)) die(`Cannot create ${config}.${sid}`);
 			changed[config] = true;
+			if (recorder) push(recorder.created, { config, sid });
 		}
 		return sid;
 	}
+	function find_unique(config, type_name, predicate) {
+		let found = filter(sections(uci, config, type_name), predicate);
+		if (length(found) > 1) die(`Mode switch refused: ambiguous matching sections in ${config}.${type_name}`);
+		return found[0]?.['.name'];
+	}
+	function reserve(config, type_name, sid) {
+		if (uci.get_all(config, sid)) die(`Mode switch refused: reserved section already exists at ${config}.${sid}`);
+		return ensure(config, type_name, sid);
+	}
 	function set(config, sid, values) {
 		for (let key, value in values) {
+			if (recorder) record_option(uci, recorder, config, sid, key);
 			let previous = uci.get(config, sid, key);
 			if (value == null && previous == null) continue;
 			if (sprintf('%J', value) == sprintf('%J', previous)) continue;
@@ -60,27 +76,36 @@ export function synchronize(uci, data, upstream4, target) {
 		}
 	}
 	let sid = sections(uci, 'network', 'globals')[0]?.['.name'] || ensure('network', 'globals', 'globals');
+	let ap = uci.get('network', sid, 'router_tool_ap') == '1';
+	let role = uci.get('network', 'wan', 'proto') == 'pppoe' ? 'main' : 'sub';
+	let previous = uci.get('network', sid, 'router_tool_auto');
+	let saved = uci.get('network', sid, 'router_tool_state');
+	let state = previous || saved ? read_snapshot(saved, previous) : null;
+	if (!ap && previous != role && state) check_snapshot(uci, state, true);
 	// Apply platform defaults once; preserve explicit user choices on reload
 	// and role changes, including disabled RPS/RFS and all-CPU steering.
 	let defaults = data.platform_defaults?.[target] || data.platform_defaults?.[split(target || '', '/')[0]];
-	for (let option, value in defaults?.network || {})
-		if (uci.get('network', sid, option) == null)
-			set('network', sid, { [option]: value });
+	if (defaults?.network && uci.get('network', sid, 'router_tool_steering_defaults_done') != '1') {
+		for (let option, value in defaults.network)
+			if (uci.get('network', sid, option) == null)
+				set('network', sid, { [option]: value });
+		set('network', sid, { router_tool_steering_defaults_done: '1' });
+	}
 	if (defaults?.firewall && uci.get('network', sid, 'router_tool_offload_defaults_done') != '1') {
 		let firewall = sections(uci, 'firewall', 'defaults')[0]?.['.name'] || ensure('firewall', 'defaults', 'defaults');
-		// The LuCI "None" choice removes both options. Initialize only
-		// once so clearing them later remains a persistent user choice.
-		if (uci.get('firewall', firewall, 'flow_offloading') == null &&
-		    uci.get('firewall', firewall, 'flow_offloading_hw') == null)
-			set('firewall', firewall, defaults.firewall);
+		// Initialize the preset even when firewall4 ships its own defaults.
+		// The marker preserves later user choices, including LuCI "None",
+		// which removes both options.
+		set('firewall', firewall, defaults.firewall);
 		set('network', sid, { router_tool_offload_defaults_done: '1' });
 	}
 	// Keep later user-added ULA prefixes after the one-time cleanup.
 	if (uci.get('network', sid, 'router_tool_ula_cleanup_done') != '1')
 		set('network', sid, { ula_prefix: null, router_tool_ula_cleanup_done: '1' });
-	if (uci.get('network', sid, 'router_tool_ap') == '1') return keys(changed);
-	let role = uci.get('network', 'wan', 'proto') == 'pppoe' ? 'main' : 'sub';
-	if (uci.get('network', sid, 'router_tool_auto') != role) {
+	if (ap) return keys(changed);
+	if (previous != role) {
+		state = { version: 1, mode: role, options: [], created: [], subnet_done: role != 'sub' };
+		recorder = state;
 		for (let group in [ data.common, data.roles[role] ])
 			for (let config in [ 'network', 'dhcp' ])
 				for (let name, options in group[config] || {}) {
@@ -89,8 +114,7 @@ export function synchronize(uci, data, upstream4, target) {
 				}
 		let zones = {};
 		for (let name in [ 'lan', 'wan' ]) {
-			let found = filter(sections(uci, 'firewall', 'zone'), section => section.name == name)[0];
-			zones[name] = found?.['.name'] || ensure('firewall', 'zone', 'router_tool_' + name);
+			zones[name] = find_unique('firewall', 'zone', section => section.name == name) || reserve('firewall', 'zone', 'router_tool_' + name);
 			set('firewall', zones[name], { name, ...data.firewall.zones[name] });
 		}
 		for (let section in sections(uci, 'firewall', 'zone')) {
@@ -100,23 +124,27 @@ export function synchronize(uci, data, upstream4, target) {
 			set('firewall', section['.name'], { network: length(networks) ? networks : null });
 		}
 		for (let section in sections(uci, 'firewall', 'defaults')) set('firewall', section['.name'], { disable_ipv6: null });
-		let forward = filter(sections(uci, 'firewall', 'forwarding'), section => section.src == 'lan' && section.dest == 'wan')[0]?.['.name'] || ensure('firewall', 'forwarding', 'router_tool_lan_wan');
+		let forward = find_unique('firewall', 'forwarding', section => section.src == 'lan' && section.dest == 'wan') || reserve('firewall', 'forwarding', 'router_tool_lan_wan');
 		set('firewall', forward, { src: 'lan', dest: 'wan', enabled: '1', family: null });
 		for (let name, values in data.firewall.rules) {
-			let existing = filter(sections(uci, 'firewall', 'rule'), section => section.name == name)[0]?.['.name'];
+			let existing = find_unique('firewall', 'rule', section => section.name == name);
 			let enabled = name != 'Router-Tool-DHCPv6-Relay' || role == 'sub';
 			if (!enabled && !existing) continue;
-			let rule = existing || ensure('firewall', 'rule', 'router_tool_' + replace(lc(name), /-/g, '_'));
+			let rule = existing || reserve('firewall', 'rule', 'router_tool_' + replace(lc(name), /-/g, '_'));
 			set('firewall', rule, enabled ? { name, enabled: '1', src: 'wan', target: 'ACCEPT', src_ip: null, dest_ip: null, ...values } : { enabled: '0' });
 		}
+		record_context(uci, state, data);
+		recorder = null;
 		set('network', sid, { router_tool_auto: role });
 	}
-	// A WAN lease may arrive after configuration was applied. Only an actual
-	// overlap changes IPv4; preserve WAN protocol/credentials and DHCP pools.
-	if (role == 'sub' && uci.get('network', 'lan', 'proto') == 'static') {
+	// Await the first lease, then check the LAN subnet once for this mode.
+	// Later lease events must not overwrite a user's addressing decisions.
+	if (role == 'sub' && !state.subnet_done && length(upstream4 || [])) {
+		if (previous == role) check_snapshot(uci, state);
+		recorder = state;
 		let upstream = filter(map(upstream4 || [], address => subnet(address)), address => address != null);
 		let lan = filter(map(array(uci.get('network', 'lan', 'ipaddr')), address => subnet(address, uci.get('network', 'lan', 'netmask'))), address => address != null);
-		if (length(filter(lan, a => length(filter(upstream, b => overlaps(a, b)))))) {
+		if (uci.get('network', 'lan', 'proto') == 'static' && length(filter(lan, a => length(filter(upstream, b => overlaps(a, b)))))) {
 			let occupied = [ ...upstream ];
 			for (let section in sections(uci, 'network', 'interface'))
 				if (section['.name'] != 'lan')
@@ -132,6 +160,10 @@ export function synchronize(uci, data, upstream4, target) {
 			if (!address) die('No non-overlapping IPv4 LAN subnet found');
 			set('network', 'lan', { ipaddr: address, netmask: null });
 		}
+		recorder = null;
+		state.subnet_done = true;
+		set('network', sid, { router_tool_state: finish_snapshot(uci, state) });
 	}
+	else if (previous != role) set('network', sid, { router_tool_state: finish_snapshot(uci, state) });
 	return keys(changed);
 }
