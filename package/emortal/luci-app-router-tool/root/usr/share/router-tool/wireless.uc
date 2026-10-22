@@ -52,25 +52,37 @@ export function synchronize_wireless(uci, board) {
 		}
 	}
 	for (let radio in radios) {
+		if (radio.router_tool_defaults_done == '1') continue;
 		let attached = filter(interfaces, iface => iface.device == radio['.name']);
-		// A station/mesh/WDS backhaul owns the shared radio settings.
-		if (length(filter(attached, iface => iface.mode != 'ap'))) continue;
+		// Decide once as soon as a radio has interfaces. Custom SSIDs and
+		// station/mesh/WDS backhauls are explicit user configuration.
+		if (!length(attached)) continue;
+		let has_ap = length(filter(attached, iface => iface.mode == 'ap')) > 0;
+		if (length(filter(attached, iface => iface.mode != 'ap'))) {
+			set(radio['.name'], { router_tool_defaults_done: '1' });
+			continue;
+		}
 		let aps = attached;
-		if (!length(aps) || length(filter(aps, iface => iface.ssid != 'OWRT' || iface.key != '12345678' || iface.encryption != 'psk2+ccmp'))) continue;
+		if (!has_ap) { set(radio['.name'], { router_tool_defaults_done: '1' }); continue; }
+		if (length(filter(aps, iface => iface.ssid != 'OWRT' || iface.key != '12345678' || iface.encryption != 'psk2+ccmp'))) {
+			set(radio['.name'], { router_tool_defaults_done: '1' });
+			continue;
+		}
 		let band = { '2g': '2G', '5g': '5G', '6g': '6G' }[radio.band];
-		if (!band) continue;
+		if (!band) { set(radio['.name'], { router_tool_defaults_done: '1' }); continue; }
 		let caps = capabilities(board, radio, band);
-		if (!caps) continue;
+		if (!caps) { set(radio['.name'], { router_tool_defaults_done: '1' }); continue; }
 		let suffix, channel, width;
 		if (band == '2G') { suffix = '2.4G'; channel = '1'; width = 20; }
 		else if (band == '6G') { suffix = '6G'; channel = '33'; width = 160; }
 		else if (caps.width == 80) { suffix = '5.8G'; channel = '149'; width = 80; }
 		else { suffix = '5.2G'; channel = '36'; width = 160; }
 		let mode = htmode(caps, width);
-		if (!mode) continue;
+		if (!mode) { set(radio['.name'], { router_tool_defaults_done: '1' }); continue; }
 		set(radio['.name'], { country: 'US', channel, htmode: mode });
 		for (let ap in aps)
 			set(ap['.name'], { ssid: 'OWRT-' + suffix, encryption: band == '6G' ? 'sae+ccmp' : 'psk2+ccmp', ieee80211w: band == '6G' ? '2' : null });
+		set(radio['.name'], { router_tool_defaults_done: '1' });
 	}
 	return changed;
 }

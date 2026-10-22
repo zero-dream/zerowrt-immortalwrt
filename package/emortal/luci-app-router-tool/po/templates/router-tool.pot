@@ -1,22 +1,22 @@
 msgid ""
 msgstr "Content-Type: text/plain; charset=UTF-8"
 
-#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:71
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:167
 msgid ""
 "Automatic AP conversion requires plain Ethernet ports. Configure VLAN or "
 "switch topologies manually."
 msgstr ""
 
-#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:64
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:160
 msgid ""
 "Cannot identify the Ethernet WAN device. Configure LAN/WAN devices first."
 msgstr ""
 
-#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:62
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:158
 msgid "Cannot read board port assignments. Configure AP ports manually."
 msgstr ""
 
-#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:264
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:378
 msgid ""
 "Manually enable to bridge all Ethernet ports and obtain IPv4/IPv6 from the "
 "upstream router; disable to restore the previous settings. When disabled, "
@@ -24,7 +24,26 @@ msgid ""
 "router mode."
 msgstr ""
 
-#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:145
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:116
+msgid ""
+"Mode switch refused: configuration changed while this page was open. Reload "
+"the page."
+msgstr ""
+
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:88
+msgid ""
+"Mode switch refused: saved configuration snapshot is missing or invalid."
+msgstr ""
+
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:105
+msgid "Mode switch refused: user changed related options:"
+msgstr ""
+
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:379
+msgid "Mode switches stop if related settings have been edited."
+msgstr ""
+
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:241
 msgid ""
 "No free LAN subnet was found. Configure a non-overlapping IPv4 subnet "
 "manually."
@@ -34,12 +53,6 @@ msgstr ""
 msgid "Read board Ethernet port assignments for router tool presets"
 msgstr ""
 
-#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:263
+#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:377
 msgid "Relay AP mode"
-msgstr ""
-
-#: luci-app-router-tool/htdocs/luci-static/resources/tools/router-tool.js:203
-msgid ""
-"The saved configuration is missing or invalid. Restore LAN/WAN settings "
-"manually before disabling AP mode."
 msgstr ""

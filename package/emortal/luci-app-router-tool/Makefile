@@ -3,8 +3,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-router-tool
-PKG_VERSION:=20261020
-PKG_RELEASE:=1
+PKG_VERSION:=20261022
+PKG_RELEASE:=3
 PKG_PO_VERSION:=$(PKG_VERSION)-r$(PKG_RELEASE)
 PKG_LICENSE:=GPL-2.0-only
 
@@ -12,6 +12,10 @@ LUCI_TITLE:=LuCI Router Tool presets
 LUCI_DEPENDS:=luci-mod-network +odhcp6c +odhcpd-ipv6only +firewall4 +ucode-mod-fs +ucode-mod-log +ucode-mod-uci +ucode-mod-ubus
 LUCI_DEFAULT:=y if PACKAGE_luci-mod-network
 LUCI_PKGARCH:=all
+
+define Package/$(PKG_NAME)/conffiles
+/etc/router-tool/
+endef
 
 # Copy the feed view and extend it in this package.  The feed checkout stays
 # untouched, so a later feed update cannot remove the integration.

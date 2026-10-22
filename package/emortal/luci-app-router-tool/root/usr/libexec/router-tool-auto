@@ -6,6 +6,10 @@ import { connect } from 'ubus';
 import { openlog, syslog, closelog, LOG_PID, LOG_DAEMON, LOG_DEBUG, LOG_INFO, LOG_NOTICE, LOG_WARNING, LOG_ERR } from 'log';
 import { synchronize } from '/usr/share/router-tool/auto.uc';
 import { synchronize_wireless } from '/usr/share/router-tool/wireless.uc';
+import { read_snapshot, check_snapshot } from '/usr/share/router-tool/snapshot.uc';
+import { configuration, transaction, save_transaction, commit_transaction } from '/usr/share/router-tool/transaction.uc';
+
+const transaction_path = '/etc/router-tool/pending.json';
 
 // Keep interface events quiet unless the state or the failure changes.
 function log_once(priority, key, message) {
@@ -37,9 +41,29 @@ try {
 	for (let config in [ 'network', 'dhcp', 'firewall', 'wireless' ])
 		unlink('/var/run/router-tool-delta/' + config);
 	let uci = cursor('/etc/config', '/var/run/router-tool-delta', '');
+	function commit(state) {
+		return commit_transaction(state, transaction_path,
+			name => { stage = 'commit ' + name; },
+			name => { push(committed, name); syslog(LOG_INFO, '%s', 'Committed configuration: ' + name); },
+			cursor('/etc/config', '/var/run/router-tool-delta', ''));
+	}
+	if (stat(transaction_path)) {
+		stage = 'transaction recovery';
+		// A previously deferred wireless edit must not be consumed on recovery.
+		if (stat('/tmp/.uci/wireless')?.size) die('Unapplied wireless changes defer transaction recovery');
+		let recovered = commit(json(readfile(transaction_path)));
+		syslog(LOG_NOTICE, '%s', 'Recovered interrupted configuration transaction');
+		if (length(recovered)) print(join(' ', recovered), '\n');
+		closelog();
+		exit(0);
+	}
+	let before = configuration(uci);
 	let globals = null;
 	uci.foreach('network', 'globals', section => { if (globals == null) globals = section['.name']; });
 	let ap = uci.get('network', globals, 'router_tool_ap') == '1';
+	let previous = uci.get('network', globals, 'router_tool_auto');
+	let saved = uci.get('network', globals, 'router_tool_state');
+	let role = uci.get('network', 'wan', 'proto') == 'pppoe' ? 'main' : 'sub';
 	let missing_snapshot = ap && !uci.get('network', globals, 'router_tool_ap_state');
 	if (missing_snapshot) {
 		let marker = '/var/run/router-tool-ap-warning';
@@ -48,7 +72,21 @@ try {
 			writefile(marker, '1\n');
 			syslog(LOG_WARNING, '%s', 'AP mode flag is set without a saved LuCI snapshot; automatic AP conversion is skipped');
 		}
+		closelog();
+		exit(0);
 	}
+	let guard = null;
+	if (ap) guard = read_snapshot(uci.get('network', globals, 'router_tool_ap_state'), 'ap');
+	else if (previous || saved) {
+		guard = read_snapshot(saved, previous);
+		if (previous != role)
+			for (let option in guard.options)
+				if (option.config == 'network' && option.sid == 'wan' && option.key == 'proto')
+					option.expected = uci.get('network', 'wan', 'proto');
+	}
+	if (!ap && uci.get('network', globals, 'router_tool_ap_state'))
+		die('Mode switch refused: an AP snapshot exists while AP mode is disabled; restore AP mode and use LuCI to switch back');
+	if (ap) check_snapshot(uci, guard);
 	let upstream = [];
 	if (!ap) {
 		try {
@@ -94,13 +132,11 @@ try {
 		if (sprintf('%J', previous_lan) != sprintf('%J', next_lan))
 			log_once(LOG_NOTICE, 'lan', sprintf('LAN subnet overlaps WAN; changing %J to %J', previous_lan, next_lan));
 	}
-	// Write the role/default markers last. A failed earlier commit must not
-	// suppress reconstruction of the unfinished transaction on the next event.
-	for (let config in filter([ 'firewall', 'dhcp', 'wireless', 'network' ], name => index(changed, name) >= 0)) {
-		stage = 'commit ' + config;
-		if (!uci.commit(config)) die(`Unable to commit router tool settings in ${config}`);
-		push(committed, config);
-		syslog(LOG_INFO, '%s', 'Committed configuration: ' + config);
+	if (length(changed)) {
+		stage = 'transaction persistence';
+		let pending = transaction(uci, before, guard);
+		save_transaction(transaction_path, pending);
+		changed = commit(pending);
 	}
 	let mode = ap ? 'ap' : uci.get('network', 'wan', 'proto') == 'pppoe' ? 'main' : 'sub';
 	let status = sprintf('%J', { mode: missing_snapshot ? 'ap-pending' : mode,
