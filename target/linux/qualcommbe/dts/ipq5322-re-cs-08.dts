@@ -107,7 +107,7 @@
 	ports {
 		port@1 {
 			label = "wan";
-			nvmem-cells = <&wan_macaddr>;
+			nvmem-cells = <&wan_macaddr 0>;
 			nvmem-cell-names = "mac-address";
 		};
 
@@ -129,9 +129,6 @@
 	status = "okay";
 
 	ethernet-ports {
-		#address-cells = <1>;
-		#size-cells = <0>;
-
 		ppe_sfp: port@2 {
 			reg = <2>;
 			label = "sfp";
@@ -221,7 +218,9 @@
 						};
 
 						wan_macaddr: macaddr@6 {
+							compatible = "mac-base";
 							reg = <0x6 0x6>;
+							#nvmem-cell-cells = <1>;
 						};
 					};
 				};

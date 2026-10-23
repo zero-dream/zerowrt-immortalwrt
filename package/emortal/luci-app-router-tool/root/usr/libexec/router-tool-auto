@@ -79,10 +79,9 @@ try {
 	if (ap) guard = read_snapshot(uci.get('network', globals, 'router_tool_ap_state'), 'ap');
 	else if (previous || saved) {
 		guard = read_snapshot(saved, previous);
-		if (previous != role)
-			for (let option in guard.options)
-				if (option.config == 'network' && option.sid == 'wan' && option.key == 'proto')
-					option.expected = uci.get('network', 'wan', 'proto');
+		for (let option in guard.options)
+			if (option.config == 'network' && option.sid == 'wan' && option.key == 'proto')
+				option.expected = uci.get('network', 'wan', 'proto');
 	}
 	if (!ap && uci.get('network', globals, 'router_tool_ap_state'))
 		die('Mode switch refused: an AP snapshot exists while AP mode is disabled; restore AP mode and use LuCI to switch back');
@@ -92,7 +91,8 @@ try {
 		try {
 			let bus = connect();
 			let status = bus?.call('network.interface.wan', 'status', {});
-			upstream = map(status?.['ipv4-address'] || [], address => `${address.address}/${address.mask}`);
+			if (status?.up && status.proto == uci.get('network', 'wan', 'proto'))
+				upstream = map(status['ipv4-address'] || [], address => `${address.address}/${address.mask}`);
 			bus?.disconnect();
 			if (status) unlink('/var/run/router-tool-log-wan');
 			else log_once(LOG_DEBUG, 'wan', 'WAN status is unavailable; LAN subnet check awaits the next interface event');

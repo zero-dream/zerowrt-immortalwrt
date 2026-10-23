@@ -2,7 +2,6 @@
 'require baseclass';
 'require form';
 'require fs';
-'require network';
 'require rpc';
 'require uci';
 
@@ -14,8 +13,20 @@ const callBoardJSON = rpc.declare({
 	expect: { '': {} }
 });
 
+const callInterfaces = rpc.declare({
+	object: 'network.interface',
+	method: 'dump',
+	expect: { 'interface': [] }
+});
+
 const copy = value => value == null ? null : JSON.parse(JSON.stringify(value));
 const equal = (a, b) => JSON.stringify(a ?? null) == JSON.stringify(b ?? null);
+
+function optionEqual(option, a, b) {
+	// Firewall's unchecked masquerading flags are omitted by its LuCI view.
+	const optional = option.config == 'firewall' && option.type == 'zone' && [ 'masq', 'masq6' ].includes(option.key);
+	return equal(optional ? a ?? '0' : a, optional ? b ?? '0' : b);
+}
 
 function sectionValues(config, sid) {
 	const section = uci.sections(config).find(s => s['.name'] == sid);
@@ -80,6 +91,15 @@ function globals() {
 	return uci.sections('network', 'globals')[0]?.['.name'];
 }
 
+function wan6Device() {
+	const proto = uci.get('network', 'wan', 'proto');
+	const device = uci.get('network', 'wan', 'device');
+	// Ethernet IPv6 must be available before the IPv4 DHCP lease arrives.
+	// PPP and other protocols still need their negotiated L3 device.
+	return [ 'dhcp', 'static' ].includes(proto) &&
+		typeof device == 'string' && device.length && !/\s/.test(device) ? device : '@wan';
+}
+
 function readSnapshot(sid, option, mode) {
 	try {
 		const state = JSON.parse(uci.get('network', sid, option) || 'null');
@@ -113,21 +133,25 @@ function checkSnapshot(state, live, wanTrigger) {
 	const conflicts = [];
 	for (const o of state.options) {
 		if (wanTrigger && o.config == 'network' && o.sid == 'wan' && o.key == 'proto') continue;
-		if (get(o.config, o.sid) != o.type || !equal(get(o.config, o.sid, o.key), o.expected))
+		if (get(o.config, o.sid) != o.type || !optionEqual(o, get(o.config, o.sid, o.key), o.expected))
 			conflicts.push(`${o.config}.${o.sid}.${o.key}`);
 	}
 	for (const s of state.created) {
 		const section = live?.[s.config]?.[s.sid];
 		const values = live ? section && Object.fromEntries(Object.entries(section).filter(v => v[0][0] != '.')) : sectionValues(s.config, s.sid);
-		if (get(s.config, s.sid) != s.type || !values || Object.keys(values).length != Object.keys(s.values).length ||
-			Object.keys(s.values).some(key => !Object.hasOwn(values, key) || !equal(values[key], s.values[key]))) conflicts.push(`${s.config}.${s.sid}`);
+		if (get(s.config, s.sid) != s.type || !values ||
+			Array.from(new Set(Object.keys(values).concat(Object.keys(s.values)))).some(key =>
+				!optionEqual({ ...s, key }, values[key], s.values[key]))) conflicts.push(`${s.config}.${s.sid}`);
 	}
 	if (conflicts.length) refuse(_('Mode switch refused: user changed related options:') + ' ' + conflicts.join(', '));
 }
 
-function verifyLiveSnapshot(sid, selected, enabled) {
+function verifyLiveSnapshot(sid, selected, enabled, before) {
 	const role = uci.get('network', 'wan', 'proto') == 'pppoe' ? 'main' : 'sub';
-	if (selected == enabled && (enabled || uci.get('network', sid, 'router_tool_auto') == role)) return Promise.resolve();
+	const previous = readSnapshot(sid, 'router_tool_state', uci.get('network', sid, 'router_tool_auto'));
+	const protocol = previous?.options.find(o => o.config == 'network' && o.sid == 'wan' && o.key == 'proto');
+	if (selected == enabled && (enabled || uci.get('network', sid, 'router_tool_auto') == role &&
+		(!protocol || protocol.expected == uci.get('network', 'wan', 'proto')))) return Promise.resolve();
 	const configs = [ 'network', 'dhcp', 'firewall', 'wireless' ];
 	return Promise.all(configs.map(config => uci.callLoad(config))).then(values => {
 		const live = Object.fromEntries(configs.map((config, i) => [ config, values[i] ]));
@@ -137,15 +161,25 @@ function verifyLiveSnapshot(sid, selected, enabled) {
 			if (!equal(live.network[sid]?.[key], uci.get('network', sid, key)))
 				refuse(_('Mode switch refused: configuration changed while this page was open. Reload the page.'));
 		const state = readSnapshot(sid, enabled ? 'router_tool_ap_state' : 'router_tool_state', enabled ? 'ap' : uci.get('network', sid, 'router_tool_auto'));
-		if (enabled || uci.get('network', sid, 'router_tool_auto') || uci.get('network', sid, 'router_tool_state')) checkSnapshot(state, live, !selected && !enabled);
+		if (enabled || uci.get('network', sid, 'router_tool_auto') || uci.get('network', sid, 'router_tool_state')) {
+			checkSnapshot(state, before, !selected && !enabled);
+			checkSnapshot(state, live, !selected && !enabled);
+		}
 	});
 }
 
-function routerSnapshot(sid, wanTrigger) {
-	const role = uci.get('network', sid, 'router_tool_auto');
-	const state = readSnapshot(sid, 'router_tool_state', role);
-	if (role || uci.get('network', sid, 'router_tool_state')) checkSnapshot(state, null, wanTrigger);
-	return state;
+function retainedOptions(map, sid, enabled) {
+	const state = readSnapshot(sid, enabled ? 'router_tool_ap_state' : 'router_tool_state', enabled ? 'ap' : uci.get('network', sid, 'router_tool_auto'));
+	const options = (state?.options || []).concat((state?.created || []).flatMap(s =>
+		Object.entries(s.values).map(([ key, expected ]) => ({ config: s.config, sid: s.sid, key, expected }))));
+	return options.filter(o => {
+		if (o.expected == null || !equal(o.expected, uci.get(o.config, o.sid, o.key))) return false;
+		const field = map.lookupOption?.(o.key, o.sid, o.config)?.[0];
+		if (!field || !field.isActive(o.sid)) return true;
+		// LuCI represents disabled odhcpd services with an empty choice.
+		const value = o.config == 'dhcp' && [ 'dhcpv4', 'ra', 'dhcpv6', 'ndp' ].includes(o.key) && o.expected == 'disabled' ? '' : o.expected;
+		return (equal(value, field.default) || value === '') && equal(value, field.formvalue(o.sid));
+	});
 }
 
 function recordContext(state, data) {
@@ -265,7 +299,6 @@ function synchronize(sid, context) {
 	if (uci.get('network', sid, 'router_tool_ap') == '1') return;
 	const role = uci.get('network', 'wan', 'proto') == 'pppoe' ? 'main' : 'sub';
 	if (uci.get('network', sid, 'router_tool_auto') != role) {
-		routerSnapshot(sid, true);
 		console.info(`[router-tool] Preparing ${role} router presets`);
 		const state = { version: 1, mode: role, options: [], created: [], subnet_done: role != 'sub' };
 		recorder = state;
@@ -274,11 +307,12 @@ function synchronize(sid, context) {
 				for (const config of [ 'network', 'dhcp' ])
 					for (const [ name, options ] of Object.entries(group[config] || {})) {
 						ensure(config, config == 'network' ? 'interface' : 'dhcp', name);
-						setOptions(config, name, options);
+						setOptions(config, name, config == 'network' && name == 'wan6' ?
+							{ ...options, device: wan6Device() } : options);
 					}
 			configureFirewall(role, context.presets.firewall);
 			recordContext(state, context.presets);
-			if (role == 'sub' && context.upstream4.length) {
+			if (role == 'sub' && context.upstream4.length && context.upstreamProtocol == uci.get('network', 'wan', 'proto')) {
 				avoidSubnetConflict(context);
 				state.subnet_done = true;
 			}
@@ -287,10 +321,17 @@ function synchronize(sid, context) {
 		uci.set('network', sid, 'router_tool_auto', role);
 		uci.set('network', sid, 'router_tool_state', finishSnapshot(state));
 	}
+	else {
+		const state = readSnapshot(sid, 'router_tool_state', role);
+		const option = state?.options.find(o => o.config == 'network' && o.sid == 'wan' && o.key == 'proto');
+		if (option && option.expected != uci.get('network', 'wan', 'proto')) {
+			option.expected = uci.get('network', 'wan', 'proto');
+			uci.set('network', sid, 'router_tool_state', JSON.stringify(state));
+		}
+	}
 }
 
 function enableAp(sid, context) {
-	routerSnapshot(sid, false);
 	const topo = topology(context);
 	validateAp(topo, context);
 	console.info(`[router-tool] Preparing AP mode on ${topo.bridgeName}; Ethernet ports: ${topo.ports.join(' ')}`);
@@ -327,7 +368,6 @@ function enableAp(sid, context) {
 
 function disableAp(sid) {
 	const state = readSnapshot(sid, 'router_tool_ap_state', 'ap');
-	checkSnapshot(state);
 	for (const option of state.options.slice().reverse())
 		if (uci.get(option.config, option.sid) != null)
 			setOptions(option.config, option.sid, { [option.key]: option.value });
@@ -342,18 +382,19 @@ return baseclass.extend({
 		if (map._routerToolAttached) return;
 		map._routerToolAttached = true;
 		for (const config of [ 'network', 'dhcp', 'firewall', 'wireless' ]) map.chain(config);
-		const context = { board: null, upstream4: [], presets: null };
+		const context = { board: null, upstream4: [], upstreamProtocol: null, presets: null };
 		const load = map.load.bind(map);
 		map.load = function() {
 			return Promise.all([ load(), callBoardJSON().catch(e => {
 				console.warn('[router-tool] Board port assignments could not be loaded: ' + e.message);
 				return {};
 			}),
-				fs.read('/usr/share/router-tool/auto.json'), network.getNetworks() ]).then(data => {
+				fs.read('/usr/share/router-tool/auto.json'), callInterfaces().catch(() => []) ]).then(data => {
 				context.board = data[1];
 				context.presets = JSON.parse(data[2]);
-				const upstream = uci.get('network', 'lan', 'proto') == 'dhcp' ? 'lan' : 'wan';
-				context.upstream4 = data[3].find(n => n.getName() == upstream)?.getIPAddrs() || [];
+				const upstream = data[3].find(n => n.interface == 'wan') || {};
+				context.upstreamProtocol = upstream.proto;
+				context.upstream4 = upstream.up ? (upstream['ipv4-address'] || []).map(a => `${a.address}/${a.mask}`) : [];
 			}).catch(e => {
 				console.error('[router-tool] Failed to load role settings: ' + e.message);
 				throw e;
@@ -366,9 +407,19 @@ return baseclass.extend({
 			const option = map._routerToolOption;
 			const enabled = uci.get('network', sid, 'router_tool_ap') == '1';
 			const selected = option ? option.formvalue(sid) == '1' : enabled;
+			const retained = retainedOptions(map, sid, enabled);
+			// Validate the loaded configuration, before form parsing removes
+			// default or inactive options during a protocol switch. Check fresh
+			// server values as well, so an external edit still stops the switch.
+			const before = Object.fromEntries([ 'network', 'dhcp', 'firewall', 'wireless' ].map(config =>
+				[ config, Object.fromEntries(uci.sections(config).map(s => [ s['.name'], copy(uci.get(config, s['.name'])) ])) ]));
 			// Only the standard map save/apply flow persists these changes.
-			return save(() => verifyLiveSnapshot(sid, selected, enabled).then(() => {
+			return save(() => verifyLiveSnapshot(sid, selected, enabled, before).then(() => {
 				previous = copy(uci.state);
+				// Preserve unchanged owned values which LuCI removes as default
+				// or inactive fields. Explicit active edits remain user changes.
+				for (const o of retained)
+					if (uci.get(o.config, o.sid, o.key) == null) uci.set(o.config, o.sid, o.key, copy(o.expected));
 				if (sid && selected != enabled) {
 					if (selected) enableAp(sid, context);
 					else disableAp(sid);

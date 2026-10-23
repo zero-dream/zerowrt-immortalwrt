@@ -53,12 +53,12 @@ export function synchronize_wireless(uci, board) {
 	}
 	for (let radio in radios) {
 		if (radio.router_tool_defaults_done == '1') continue;
-		let attached = filter(interfaces, iface => iface.device == radio['.name']);
+		let attached = filter(interfaces, iface => index(array(iface.device), radio['.name']) >= 0);
 		// Decide once as soon as a radio has interfaces. Custom SSIDs and
 		// station/mesh/WDS backhauls are explicit user configuration.
 		if (!length(attached)) continue;
 		let has_ap = length(filter(attached, iface => iface.mode == 'ap')) > 0;
-		if (length(filter(attached, iface => iface.mode != 'ap'))) {
+		if (length(filter(attached, iface => iface.mode != 'ap' || iface.wds == '1' || length(array(iface.device)) != 1 || iface.mlo == '1'))) {
 			set(radio['.name'], { router_tool_defaults_done: '1' });
 			continue;
 		}
@@ -71,7 +71,9 @@ export function synchronize_wireless(uci, board) {
 		let band = { '2g': '2G', '5g': '5G', '6g': '6G' }[radio.band];
 		if (!band) { set(radio['.name'], { router_tool_defaults_done: '1' }); continue; }
 		let caps = capabilities(board, radio, band);
-		if (!caps) { set(radio['.name'], { router_tool_defaults_done: '1' }); continue; }
+		// PHY capabilities may arrive after the first boot event. Retry when
+		// they are available instead of permanently skipping the defaults.
+		if (!caps) continue;
 		let suffix, channel, width;
 		if (band == '2G') { suffix = '2.4G'; channel = '1'; width = 20; }
 		else if (band == '6G') { suffix = '6G'; channel = '33'; width = 160; }

@@ -11,6 +11,15 @@ function array(value) {
 	return type(value) == 'array' ? value : value == null ? [] : split(value, /\s+/);
 }
 
+function wan6_device(uci) {
+	let proto = uci.get('network', 'wan', 'proto');
+	let device = uci.get('network', 'wan', 'device');
+	// Ethernet IPv6 must be available before the IPv4 DHCP lease arrives.
+	// PPP and other protocols still need their negotiated L3 device.
+	return index([ 'dhcp', 'static' ], proto) >= 0 &&
+		type(device) == 'string' && length(device) && !match(device, /\s/) ? device : '@wan';
+}
+
 function subnet(value, netmask) {
 	let parts = split('' + value, '/');
 	if (length(parts) > 2) return null;
@@ -110,7 +119,8 @@ export function synchronize(uci, data, upstream4, target) {
 			for (let config in [ 'network', 'dhcp' ])
 				for (let name, options in group[config] || {}) {
 					ensure(config, config == 'network' ? 'interface' : 'dhcp', name);
-					set(config, name, options);
+					set(config, name, config == 'network' && name == 'wan6' ?
+						{ ...options, device: wan6_device(uci) } : options);
 				}
 		let zones = {};
 		for (let name in [ 'lan', 'wan' ]) {
@@ -165,5 +175,13 @@ export function synchronize(uci, data, upstream4, target) {
 		set('network', sid, { router_tool_state: finish_snapshot(uci, state) });
 	}
 	else if (previous != role) set('network', sid, { router_tool_state: finish_snapshot(uci, state) });
+	else {
+		for (let option in state.options)
+			if (option.config == 'network' && option.sid == 'wan' && option.key == 'proto' && option.expected != uci.get('network', 'wan', 'proto')) {
+				check_snapshot(uci, state, true);
+				option.expected = uci.get('network', 'wan', 'proto');
+				set('network', sid, { router_tool_state: sprintf('%J', state) });
+			}
+	}
 	return keys(changed);
 }

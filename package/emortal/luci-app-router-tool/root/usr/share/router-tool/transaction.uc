@@ -1,7 +1,7 @@
 // Persist a preset's exact edits before the first UCI commit. Recovery accepts
 // only the recorded old/new values, preserving unrelated edits and refusing drift.
 import { open, mkdir, rename, unlink, stat } from 'fs';
-import { equal, section_values, value_valid, read_snapshot } from './snapshot.uc';
+import { equal, option_equal, section_equal, section_values, value_valid, read_snapshot } from './snapshot.uc';
 
 export function configuration(uci) {
 	let result = {};
@@ -117,7 +117,7 @@ export function commit_transaction(state, path, before_commit, after_commit, cur
 			let value = saved?.[option.key];
 			let change = option_edit(option.config, option.sid, option.key);
 			if (saved?.['.type'] != option.type ||
-				!equal(value, option.expected) && !(change && equal(value, change.after)))
+				!option_equal(option, value, option.expected) && !(change && equal(value, change.after)))
 				refuse_change(`Transaction recovery refused: user changed ${option.config}.${option.sid}.${option.key}`);
 		}
 		for (let saved in guard.created) {
@@ -125,7 +125,7 @@ export function commit_transaction(state, path, before_commit, after_commit, cur
 			let values = section_values(current_section);
 			if (current_section?.['.type'] != saved.type)
 				refuse_change(`Transaction recovery refused: user changed ${saved.config}.${saved.sid}`);
-			if (equal(values, saved.values)) continue;
+			if (section_equal(saved, values, saved.values)) continue;
 			let edit = edit_by_section[`${saved.config}/${saved.sid}`];
 			if (!edit || type(edit.options) != 'array')
 				refuse_change(`Transaction recovery refused: user changed ${saved.config}.${saved.sid}`);
