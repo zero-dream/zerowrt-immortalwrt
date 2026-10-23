@@ -73,6 +73,20 @@ define Device/glinet_gl-be6500
 endef
 TARGET_DEVICES += glinet_gl-be6500
 
+define Device/jdcloud_re-cs-06
+	$(call Device/FitImage)
+	$(call Device/EmmcImage)
+	DEVICE_VENDOR := JDCloud
+	DEVICE_MODEL := RE-CS-06
+	DEVICE_DTS_CONFIG := config@mi01.6
+	KERNEL_SIZE := 7168k
+	SOC := ipq5322
+	SUPPORTED_DEVICES += jdcloud,re-cs-06
+	DEVICE_PACKAGES := ipq-wifi-jdcloud_re-cs-06
+	IMAGE/factory.bin := append-kernel | pad-to $$(KERNEL_SIZE) | append-rootfs | append-metadata
+endef
+TARGET_DEVICES += jdcloud_re-cs-06
+
 define Device/jdcloud_re-cs-08
 	$(call Device/FitImage)
 	$(call Device/EmmcImage)

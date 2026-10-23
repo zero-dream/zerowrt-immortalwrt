@@ -26,6 +26,19 @@ export function value_valid(value) {
 		type(value) == 'array' && !length(filter(value, v => type(v) != 'string'));
 }
 
+export function option_equal(option, a, b) {
+	// The firewall UI omits unchecked masquerading flags; fw4 defaults to off.
+	let optional = option.config == 'firewall' && option.type == 'zone' && index([ 'masq', 'masq6' ], option.key) >= 0;
+	return equal(optional ? a ?? '0' : a, optional ? b ?? '0' : b);
+}
+
+export function section_equal(section, a, b) {
+	if (type(a) != 'object' || type(b) != 'object') return false;
+	for (let key in uniq([ ...keys(a), ...keys(b) ]))
+		if (!option_equal({ ...section, key }, a[key], b[key])) return false;
+	return true;
+}
+
 export function read_snapshot(text, mode) {
 	let state;
 	try { state = json(text || 'null'); } catch (e) {}
@@ -64,12 +77,12 @@ export function check_snapshot(uci, state, wan_trigger) {
 		// Changing the WAN protocol is the explicit main/sub mode trigger.
 		if (wan_trigger && o.config == 'network' && o.sid == 'wan' && o.key == 'proto') continue;
 		let saved = section(o.config, o.sid);
-		if (saved?.['.type'] != o.type || !equal(saved?.[o.key], o.expected))
+		if (saved?.['.type'] != o.type || !option_equal(o, saved?.[o.key], o.expected))
 			push(conflicts, `${o.config}.${o.sid}.${o.key}`);
 	}
 	for (let s in state.created) {
 		let saved = section(s.config, s.sid);
-		if (saved?.['.type'] != s.type || !equal(section_values(saved), s.values))
+		if (saved?.['.type'] != s.type || !section_equal(s, section_values(saved), s.values))
 			push(conflicts, `${s.config}.${s.sid}`);
 	}
 	if (length(conflicts)) die('Mode switch refused: user changed ' + join(', ', conflicts));

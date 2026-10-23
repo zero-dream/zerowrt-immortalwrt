@@ -144,6 +144,7 @@ ALLWIFIBOARDS:= \
 	dptech_ap3000-2c \
 	glinet_gl-be6500 \
 	jdcloud_re-cs-03 \
+	jdcloud_re-cs-06 \
 	nokia_beacon10 \
 	philips_ly1800 \
 	redmi_ax5 \
@@ -383,6 +384,7 @@ $(eval $(call generate-ipq-wifi-package,cmiot_ax18,CMIOT AX18))
 $(eval $(call generate-ipq-wifi-package,dptech_ap3000-2c,DPtech AP3000-2C))
 $(eval $(call generate-ipq-wifi-package,glinet_gl-be6500,GL.iNet GL-BE6500))
 $(eval $(call generate-ipq-wifi-package,jdcloud_re-cs-03,JDCloud RE-CS-03))
+$(eval $(call generate-ipq-wifi-package,jdcloud_re-cs-06,JDCloud RE-CS-06))
 $(eval $(call generate-ipq-wifi-package,nokia_beacon10,Nokia Beacon 10))
 $(eval $(call generate-ipq-wifi-package,philips_ly1800,Philips LY1800))
 $(eval $(call generate-ipq-wifi-package,redmi_ax5,Redmi AX5))
