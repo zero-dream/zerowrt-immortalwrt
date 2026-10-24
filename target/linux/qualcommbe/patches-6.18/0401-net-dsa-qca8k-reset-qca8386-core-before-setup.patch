@@ -1,4 +1,5 @@
 From: ViKing <viking.yfy@qq.com>
+Date: Sat, 24 Oct 2026 22:28:52 +0800
 Subject: [PATCH] net: dsa: qca8k: reset QCA8386 after PHY package setup
 
 MHT has a switch-core reset independent of its PHY and PCS resets.

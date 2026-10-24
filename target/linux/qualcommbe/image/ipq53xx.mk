@@ -93,7 +93,7 @@ define Device/jdcloud_re-cs-08
 	DEVICE_VENDOR := JDCloud
 	DEVICE_MODEL := RE-CS-08
 	DEVICE_DTS_CONFIG := config@mi01.6
-	KERNEL_SIZE := 6144k
+	KERNEL_SIZE := 7168k
 	SOC := ipq5322
 	SUPPORTED_DEVICES += jdcloud,re-cs-08
 	DEVICE_PACKAGES := -kmod-ath12k -wpad-openssl kmod-sfp \

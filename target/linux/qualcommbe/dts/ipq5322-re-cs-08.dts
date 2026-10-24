@@ -85,10 +85,6 @@
 	pinctrl-names = "default";
 };
 
-&q6_region {
-	reg = <0x0 0x4a900000 0x0 0x800000>;
-};
-
 &ref_48mhz_clk {
 	clock-div = <1>;
 	clock-mult = <2>;
@@ -266,4 +262,12 @@
 		drive-strength = <8>;
 		bias-pull-down;
 	};
+};
+
+&q6_region {
+	reg = <0x0 0x4a900000 0x0 0x800000>;
+};
+
+&tzapp {
+	reg = <0x0 0x4b100000 0x0 0x800000>;
 };

@@ -1,4 +1,5 @@
-From: VIKING <viking.yfy@qq.com>
+From: ViKing <viking.yfy@qq.com>
+Date: Sat, 24 Oct 2026 22:28:52 +0800
 Subject: [PATCH] wifi: ath12k: use QCN9274 revision specific DS registers
 
 The QCN9274 hw1.0 REO2PPE ring starts at 0x91c, while hw2.0 uses 0x938.
@@ -12,7 +13,7 @@ are shared by both revisions. No board or host SoC special case is
 needed, and the established hw2.0 path keeps its existing values.
 
 Link: https://android.googlesource.com/kernel/msm-modules/wlan-fw-api/+/9ab723333db68e4552672f9e2a5cc6f8e4027894/hw/qcn9224/
-Signed-off-by: VIKING <viking.yfy@qq.com>
+Signed-off-by: ViKing <viking.yfy@qq.com>
 ---
 --- a/drivers/net/wireless/ath/ath12k/hal.h
 +++ b/drivers/net/wireless/ath/ath12k/hal.h

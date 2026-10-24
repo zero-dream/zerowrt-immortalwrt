@@ -1,5 +1,5 @@
 From: ViKing <viking.yfy@qq.com>
-Date: Mon, 12 Oct 2026 16:00:00 +0800
+Date: Sat, 24 Oct 2026 22:28:52 +0800
 Subject: [PATCH] net: ethernet: qualcomm: ppe: pad short TX packets
 
 QSDK R48 enables NSS_DP_TX_SMALL_PACKET_WAR for EDMA v2/v3 and sets

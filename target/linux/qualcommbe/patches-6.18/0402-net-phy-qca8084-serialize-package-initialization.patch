@@ -1,4 +1,5 @@
 From: ViKing <viking.yfy@qq.com>
+Date: Sat, 24 Oct 2026 22:28:52 +0800
 Subject: [PATCH] net: phy: qca8084: serialize and retry package initialization
 
 phy_package_init_once() claims its bit before running shared hardware
@@ -7,9 +8,10 @@ package, and a failed SRAM, PCS or clock operation permanently suppresses
 later attempts while the package remains joined.
 
 Serialize QCA8084 package configuration and publish completion only on
-success. Unwind package clocks enabled by an unsuccessful attempt so retries do
-not accumulate enable references. Keep the existing successful clock
-order and apply the same handling to QXGMII and switch package modes.
+success. Unwind package clocks enabled by an unsuccessful attempt so
+retries do not accumulate enable references. Keep the existing
+successful clock order and apply the same handling to QXGMII and
+switch package modes.
 
 Signed-off-by: ViKing <viking.yfy@qq.com>
 ---

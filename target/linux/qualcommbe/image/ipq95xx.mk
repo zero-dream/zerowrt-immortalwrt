@@ -70,7 +70,7 @@ define Device/nokia_beacon10
 	SUPPORTED_DEVICES += nokia,beacon10
 	DEVICE_PACKAGES := -kmod-ath12k kmod-ath11k-ahb kmod-ath11k-pci \
 		ath11k-firmware-ipq9574-ddwrt ath11k-firmware-qcn9074-ddwrt \
-		ipq-wifi-nokia_beacon10 kmod-phy-realtek
+		ipq-wifi-nokia_beacon10 kmod-phy-realtek rtl826x-firmware
 	IMAGE/factory.bin := append-kernel | pad-to $$(KERNEL_SIZE) | append-rootfs | append-metadata
 endef
 TARGET_DEVICES += nokia_beacon10
@@ -82,7 +82,6 @@ define Device/xiaomi_be7000-common
 	DEVICE_DTS_CONFIG := config@al02-c6
 	BLOCKSIZE := 128k
 	PAGESIZE := 2048
-	SOC := ipq9574
 	DEVICE_PACKAGES := kmod-ath11k-ahb ath11k-firmware-ipq9574-ddwrt \
 		ath12k-firmware-qcn9274-ddwrt kmod-usb-storage uboot-envtools
 endef
@@ -90,6 +89,7 @@ endef
 define Device/xiaomi_be7000
 	$(call Device/xiaomi_be7000-common)
 	DEVICE_MODEL := BE7000
+	SOC := ipq9554
 	DEVICE_PACKAGES += ipq-wifi-xiaomi_be7000
 	SUPPORTED_DEVICES += xiaomi,be7000
 endef
@@ -98,6 +98,7 @@ TARGET_DEVICES += xiaomi_be7000
 define Device/xiaomi_be7000-pro
 	$(call Device/xiaomi_be7000-common)
 	DEVICE_MODEL := BE7000 Pro
+	SOC := ipq9574
 	DEVICE_PACKAGES += ipq-wifi-xiaomi_be7000-pro
 	SUPPORTED_DEVICES += xiaomi,be7000-pro
 endef
