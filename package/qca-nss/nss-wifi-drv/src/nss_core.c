@@ -32,6 +32,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/seq_file.h>
 #include <linux/sysfs.h>
+#include <linux/sizes.h>
 #include <linux/soc/qcom/qca_edma.h>
 #include <linux/soc/qcom/qca_ppe.h>
 
@@ -535,17 +536,12 @@ static void nss_core_halt(struct nss_core *core)
  * unconfigured pool is unbounded the other way: the firmware accepted 82242
  * buffers, 329 MB of slab on a 411 MB box, within ten seconds of the core
  * booting. The Wi-Fi data plane's own share of it is declared separately,
- * through nss_wifi_pool_set(). The ceiling is that share plus the 8192 the
- * connections and the exception path take; the firmware fills whatever
- * ceiling it is given, and each buffer costs a 4 KB slab object.
+ * through nss_wifi_pool_set(). The ceiling is that share plus the 16384 the
+ * expanded connections and the exception path take; the firmware fills
+ * whatever ceiling it is given, and each buffer costs a 4 KB slab object.
  */
 static unsigned int nss_pool_size;
-module_param_named(pool_size, nss_pool_size, uint, 0644);
-MODULE_PARM_DESC(pool_size, "empty buffers lent to firmware; 0 selects 16384 with WLAN, 8192 without");
-
 static unsigned int nss_pool_low;
-module_param_named(pool_low, nss_pool_low, uint, 0644);
-MODULE_PARM_DESC(pool_low, "refill threshold; 0 selects 4352 with WLAN, 4096 without");
 /* The firmware refuses a span narrower than the ring the pool is topped up
  * through, so the asked-for ceiling is not always the one that takes effect.
  * The table of lent buffers is sized from the same answer, and is allocated
@@ -556,7 +552,7 @@ unsigned int nss_pool_ceiling(void)
 	bool wlan = nss_wifili_expected();
 
 	if (!nss_pool_size)
-		nss_pool_size = wlan ? 16384 : 8192;
+		nss_pool_size = wlan ? 24576 : 16384;
 	if (!nss_pool_low)
 		nss_pool_low = wlan ? 4352 : 4096;
 	if (nss_pool_low < NSS_RING_ENTRIES)
@@ -714,7 +710,7 @@ struct nss_n2h_buf_pool {
 	u64 vaddr[NSS_N2H_PAGES_PER_MSG];
 };
 
-static unsigned int nss_pbuf_bytes = 3100000;
+static unsigned int nss_pbuf_bytes = 32 * SZ_1M;
 module_param_named(pbuf_bytes, nss_pbuf_bytes, uint, 0644);
 MODULE_PARM_DESC(pbuf_bytes, "memory lent for the firmware's packet descriptors");
 
