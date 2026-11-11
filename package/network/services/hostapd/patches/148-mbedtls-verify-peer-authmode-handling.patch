@@ -1,6 +1,5 @@
-From 763d8473f277591801c63de2abe48403eb1e7957 Mon Sep 17 00:00:00 2001
 From: Karsten Sperling <ksperling@apple.com>
-Date: Mon, 3 Aug 2026 16:47:22 +1200
+Date: Wed, 11 Nov 2026 12:12:42 +0800
 Subject: [PATCH] mbedtls: make verify_peer / authmode handling more consistent
 
 tls_conf->verify_peer and tls_connection->verify_peer were both
@@ -35,6 +34,7 @@ tls_connection_shutdown() returns -1 on failure rather than an Mbed TLS
 error code.
 
 Signed-off-by: Karsten Sperling <ksperling@apple.com>
+Signed-off-by: ViKing <viking.yfy@qq.com>
 
 --- a/src/crypto/tls_mbedtls.c
 +++ b/src/crypto/tls_mbedtls.c

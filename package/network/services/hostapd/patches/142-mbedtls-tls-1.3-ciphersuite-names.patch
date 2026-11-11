@@ -1,6 +1,5 @@
-From ea3530e5627a1d7c181fd0b6a36214c4eac6fe1f Mon Sep 17 00:00:00 2001
 From: Karsten Sperling <ksperling@apple.com>
-Date: Fri, 26 Jun 2026 14:57:31 +1200
+Date: Wed, 11 Nov 2026 12:12:42 +0800
 Subject: [PATCH] mbedtls: use standard IANA TLS 1.3 ciphersuite names
 
 Mbed TLS names TLS 1.3 ciphersuites e.g. "TLS1-3-AES-128-GCM-SHA256",
@@ -19,6 +18,7 @@ backends. (The non-standard names derived by the translation logic
 continue to be accepted.)
 
 Signed-off-by: Karsten Sperling <ksperling@apple.com>
+Signed-off-by: ViKing <viking.yfy@qq.com>
 
 --- a/src/crypto/tls_mbedtls.c
 +++ b/src/crypto/tls_mbedtls.c

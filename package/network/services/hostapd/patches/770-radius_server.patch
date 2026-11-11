@@ -1,10 +1,12 @@
 From: Felix Fietkau <nbd@nbd.name>
-Date: Thu, 16 Mar 2023 11:35:50 +0100
+Date: Wed, 11 Nov 2026 12:15:19 +0800
 Subject: [PATCH] hostapd: add experimental radius server
 
 This can be used to run a standalone EAP server that can be used from
 other APs. It uses json as user database format and can automatically
 handle reload.
+
+Signed-off-by: ViKing <viking.yfy@qq.com>
 
 --- a/hostapd/Makefile
 +++ b/hostapd/Makefile
